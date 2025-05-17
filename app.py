@@ -303,7 +303,7 @@ def add_friend():
         response = make_response(redirect('/friends'))
         users_collection.update_one(
             {"_id": current_user},
-            {"$addToSet": {"friends": friend_id}}
+            {"$addToSet": {"friends": friend_user}}
         )
         users_collection.update_one(
             {"_id": friend_user},
