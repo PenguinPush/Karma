@@ -297,16 +297,16 @@ def add_friend():
             return jsonify({"error": "user_id is required"}), 400
 
         friend_id = data["user_id"]
-        current_user = users_collection.find_one({"_id": ObjectId(get_user_session())})
-        friend_user = users_collection.find_one({"_id": ObjectId(friend_id)})
+        current_user = ObjectId(get_user_session())
+        friend_user = ObjectId(friend_id)
 
         response = make_response(redirect('/friends'))
         users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$addToSet": {"friends": friend_user}}
+            {"_id": current_user},
+            {"$addToSet": {"friends": friend_id}}
         )
         users_collection.update_one(
-            {"_id": friend_user["_id"]},
+            {"_id": friend_user},
             {"$addToSet": {"friends": current_user}}
         )
 

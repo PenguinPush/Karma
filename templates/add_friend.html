@@ -62,11 +62,11 @@
                     const newUser = urlToUserData.new_user;
 
                     if (!newUser) {
-                        document.getElementById("message").innerHTML = "signed in! redirecting...";
+                        document.getElementById("message").innerHTML = "friend added!! redirecting...";
                     }
 
                     // Send the user ID to the /login endpoint to set the session cookie
-                    const loginResponse = await fetch('/login', {
+                    const loginResponse = await fetch('/add_friend', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -75,14 +75,14 @@
                     });
 
                     if (!loginResponse.ok) {
-                        throw new Error(`Error from /login: ${loginResponse.status}`);
+                        throw new Error(`Error from /friends: ${loginResponse.status}`);
                     }
 
                     // Redirect to the home page after successful login
-                    window.location.href = '/';
+                    window.location.href = '/friends';
                 } catch (error) {
-                    console.error('Login failed:', error);
-                    alert('Login failed. Please try again.');
+                    console.error('friends failed:', error);
+                    alert('friends failed. Please try again.');
                 }
             })();
         });
