@@ -37,9 +37,10 @@ def get_jamhacks_data(jamhacks_code):
         page.goto(socials_url)
 
         name = page.locator("h1").text_content()
-        socials = [p.text_content() for p in page.locator("p").all() if p.text_content()]
+        print(name)
 
-        print(name, socials)
+        socials = [p.text_content() for p in page.locator("p").all() if p.text_content()]
+        print(socials)
 
         browser.close()
         return name, socials
