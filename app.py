@@ -296,10 +296,19 @@ def add_friend():
         if not data or "user_id" not in data:
             return jsonify({"error": "user_id is required"}), 400
 
-        user_id = data["user_id"]
+        friend_id = data["user_id"]
+        current_user = users_collection.find_one({"_id": ObjectId(get_user_session())})
+        friend_user = users_collection.find_one({"_id": ObjectId(friend_id)})
 
-        response = make_response(redirect('/'))
-        response.set_cookie('user_session', user_id)
+        response = make_response(redirect('/friends'))
+        users_collection.update_one(
+            {"_id": current_user["_id"]},
+            {"$addToSet": {"friends": friend_user}}
+        )
+        users_collection.update_one(
+            {"_id": friend_user["_id"]},
+            {"$addToSet": {"friends": current_user}}
+        )
 
         return response
 
