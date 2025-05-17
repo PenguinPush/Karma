@@ -169,6 +169,8 @@ def classify(
         f"{', '.join([f'{cat}' for cat in GOOD_SAMARITAN_CATEGORIES])}. "
         "If no specific activity from the list is clearly indicated, "
         "the category should be 'No Specific Good Samaritan Activity Detected'."
+        "Anything related to recycling, bottles, or plastic is likely related to recycling, and "
+        "Anything involving trash or picking up is likely related to litter."
     )
 
     prompt_user = (
@@ -245,7 +247,7 @@ def classify(
 
 # --- Main Execution Block (Modified for Integrated Testing) ---
 if __name__ == "__main__":
-    gcs_image_uri_to_test = "gs://karma-videos/litter.png"  # Replace with your actual image URI
+    gcs_image_uri_to_test = "gs://karma-videos/recycle.png"  # Replace with your actual image URI
 
     is_placeholder_uri = "your-gcs-bucket-name" in gcs_image_uri_to_test or \
                          "your-image.jpg" in gcs_image_uri_to_test or \
