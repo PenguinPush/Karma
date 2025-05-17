@@ -4,23 +4,23 @@ import openai
 from dotenv import load_dotenv
 import json  # For parsing JSON response
 
-# Attempt to import the image label extraction function from Image_recognizer.py
+# Attempt to import the image label extraction function from image_recognizer.py
 try:
-    from Image_recognizer import get_image_labels_and_entities
-    # This assumes Image_recognizer.py is in the same directory or Python path
+    from image_recognizer import get_image_labels_and_entities
+    # This assumes image_recognizer.py is in the same directory or Python path
     # and contains a function get_image_labels_and_entities(gcs_image_uri) -> dict[str, float]
 except ImportError:
-    print("Error: Could not import 'get_image_labels_and_entities' from 'Image_recognizer.py'.")
-    print("Please ensure 'Image_recognizer.py' exists and contains this function.")
+    print("Error: Could not import 'get_image_labels_and_entities' from 'image_recognizer.py'.")
+    print("Please ensure 'image_recognizer.py' exists and contains this function.")
 
 
     # Define a placeholder if the import fails, so the script can still be loaded (but not run successfully)
     def get_image_labels_and_entities(gcs_image_uri: str) -> dict[str, float]:
         print("Placeholder function: Real 'get_image_labels_and_entities' not found.")
-        return {"error": "Image_recognizer.py or its function not found."}
+        return {"error": "image_recognizer.py or its function not found."}
 
 # Load environment variables from .env file
-# Ensure your .env file has OPENAI_API_KEY defined (and GOOGLE_APPLICATION_CREDENTIALS if Image_recognizer.py needs it)
+# Ensure your .env file has OPENAI_API_KEY defined (and GOOGLE_APPLICATION_CREDENTIALS if image_recognizer.py needs it)
 load_dotenv()
 
 # Initialize the OpenAI client
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     else:
         print(f"--- Starting Full Image to Good Samaritan Classification Pipeline for: {gcs_image_uri_to_test} ---")
 
-        print(f"\nStep 1: Getting labels from Image_recognizer.py for: {gcs_image_uri_to_test}")
+        print(f"\nStep 1: Getting labels from image_recognizer.py for: {gcs_image_uri_to_test}")
         detected_entities_dict = get_image_labels_and_entities(gcs_image_uri_to_test)
 
         if not detected_entities_dict or "error" in detected_entities_dict:
