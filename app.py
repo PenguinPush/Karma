@@ -225,7 +225,7 @@ def upload_endpoint():
 
             print("\nStep 2 (Flask): Getting activity description from classifier...")
             img_activity_description = get_description(formatted_labels)
-            if not img_activity_description:
+            if img_activity_description is None:
                 # Handle case where description might be None, provide a default or error
                 print("Warning: get_description returned None. Using a default description.")
                 img_activity_description = "Activity could not be automatically described from labels."
@@ -233,7 +233,7 @@ def upload_endpoint():
 
             print("\nStep 3 (Flask): Classifying Good Samaritan category from classifier...")
             good_samaritan_category = classify(img_activity_description, formatted_labels)
-            if not good_samaritan_category:
+            if good_samaritan_category is None:
                 print("Warning: classify returned None. Using a default category.")
                 good_samaritan_category = "No Specific Good Samaritan Activity Detected"
             print(f"Classified Category: {good_samaritan_category}")
