@@ -333,15 +333,19 @@ def get_user_json():
 
         print(user)
 
+        friends = [str(friend) for friend in user.get("friends", [])]
+        quests = [str(quest) for quest in user.get("quests", [])]
+        photos = [str(photo) for photo in user.get("photos", [])]
+
         return jsonify({
             "jamhacks_code": user.get("jamhacks_code"),
             "name": user.get("name"),
             "socials": user.get("socials", []),
             "karma": user.get("karma"),
             "phone": user.get("phone"),
-            "friends": user.get("friends", []),
-            "quests": user.get("quests", []),
-            "photos": user.get("photos", []),
+            "friends": friends,
+            "quests": quests,
+            "photos": photos,
         })
 
     except Exception as e:
