@@ -139,8 +139,8 @@ def upload_endpoint():
         return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
 
 
-@app.route("/upload_endpoint")
-def upload_endpoint():
+@app.route("/upload_photo")
+def upload_photo():
     return render_template("upload_photo.html")
 
 
