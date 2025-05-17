@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>scan qr code</title>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <style>
+        #reader {
+            width: 512px;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+<h1>Scan QR Code</h1>
+<div id="reader"></div>
+<p id="result"></p>
+
+<script>
+    function onScanSuccess(decodedText, decodedResult) {
+        console.log(decodedText);
+
+        const payload = {
+            url: decodedText
+        };
+
+        fetch("/url_to_user", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`http error ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("response:", data);
+                document.getElementById("result").innerText = `result: ${data.user_id}`;
+            })
+            .catch(error => {
+                console.error("error:", error);
+                document.getElementById("result").innerText = `error: ${error.message}`;
+            });
+    }
+
+    function onScanError(error) {
+        console.warn(`can't scan: ${error}`);
+    }
+
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+        {facingMode: "environment"},
+        {
+            fps: 10,
+            qrbox: {width: 256, height: 256}
+        },
+        onScanSuccess,
+        onScanError
+    ).catch(err => {
+        console.error(`can't scan: ${err}`);
+    });
+</script>
+</body>
+</html>

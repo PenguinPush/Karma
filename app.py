@@ -66,6 +66,11 @@ def url_to_user():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/scan_qr")
+def scan_qr():
+    return render_template("scan_qr.html")
+
+
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
