@@ -19,7 +19,7 @@ db = client["karma"]
 users_collection = db["users"]
 
 
-@app.route('/login_endpoint', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
@@ -32,7 +32,7 @@ def login():
     return render_template('login.html')
 
 
-@app.route('/logout_endpoint')
+@app.route('/logout')
 def logout():
     response = make_response(redirect('/login'))
     response.delete_cookie('user_session')
@@ -48,7 +48,7 @@ def redirect_to_https():  # redirecting to https is needed for camera functional
 
 @app.before_request
 def check_user_session():
-    if request.endpoint not in ['login', 'static']:
+    if request.endpoint not in ['login', 'static', 'scan_qr']:
         user_session = request.cookies.get('user_session')
         if not user_session:
             return redirect('/login')
