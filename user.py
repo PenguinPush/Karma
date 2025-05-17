@@ -2,14 +2,15 @@ from bson.objectid import ObjectId
 
 
 class User:
-    def __init__(self, jamhacks_code, name, socials, karma=0, friends=None, quests=None, photos=None, _id=None):
+    def __init__(self, jamhacks_code, name, socials, karma=0, phone=None, friends=None, quests=None, photos=None, _id=None):
         self.jamhacks_code = jamhacks_code
         self.name = name
         self.socials = socials if socials else []
         self.karma = karma
-        self.friends = friends if friends else [] # store as list of objectid pointers
+        self.phone = phone
+        self.friends = friends if friends else []  # store as list of objectid pointers
         self.quests = quests if quests else []
-        self.photos = photos if photos else [] # list of pointers to google cloud
+        self.photos = photos if photos else []  # list of pointers to google cloud
         self._id = _id
 
     def to_mongo(self):
@@ -18,6 +19,7 @@ class User:
             "name": self.name,
             "socials": self.socials,
             "karma": self.karma,
+            "phone": self.phone,
             "friends": self.friends,
             "quests": self.quests,
             "photos": self.photos,
@@ -30,6 +32,7 @@ class User:
             name=data["name"],
             socials=data["socials"],
             karma=data["karma"],
+            phone=data["phone"],
             friends=data.get("friends", []),
             quests=data.get("quests", []),
             photos=data.get("photos", []),

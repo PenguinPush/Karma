@@ -1,14 +1,13 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, redirect
+from flask import Flask, render_template, request, jsonify, redirect, make_response
 from pymongo import MongoClient
 import re
 from user import User
 from web_scraper import get_jamhacks_data
-from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS
+from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS, allowed_file
 from werkzeug.utils import secure_filename
-
 
 load_dotenv()
 
@@ -18,10 +17,25 @@ client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
 db = client["karma"]
 users_collection = db["users"]
 
-def allowed_file(filename):
-    """Checks if the file's extension is allowed."""
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == 'admin' and password == 'password':
+            response = make_response(redirect('/'))
+            response.set_cookie('user_session', 'unique_session_token')
+            return response
+        return "Invalid credentials", 401
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    response = make_response(redirect('/login'))
+    response.delete_cookie('user_session')
+    return response
 
 
 @app.before_request
@@ -29,6 +43,17 @@ def redirect_to_https():  # redirecting to https is needed for camera functional
     if 'DYNO' in os.environ and request.headers.get('X-Forwarded-Proto', 'http') != 'https':
         url = request.url.replace('http://', 'https://', 1)
         return redirect(url, code=301)
+
+
+@app.before_request
+def check_user_session():
+    if request.endpoint in ["index"]:
+        user_session = request.cookies.get('user_session')
+        if not user_session:
+            if request.endpoint:
+                print("redirecting, user not logged in!!" + request.endpoint)
+            return redirect('/login')
+
 
 @app.route("/")
 def index():
@@ -51,6 +76,7 @@ def url_to_user():
         print(match.group(1))
         jamhacks_code = match.group(1)
         fetched_user = User.get_user(users_collection, jamhacks_code)
+        print(fetched_user)
 
         name, socials = get_jamhacks_data(jamhacks_code)
         if fetched_user:
@@ -59,6 +85,7 @@ def url_to_user():
                 name,
                 socials,
                 fetched_user.karma,
+                fetched_user.phone,
                 fetched_user.friends,
                 fetched_user.quests,
                 fetched_user.photos,
@@ -126,7 +153,7 @@ def upload_endpoint():
                 # upload_image_stream_to_gcs_for_user should print its own errors
                 print("GCS stream upload function returned None.")
                 return jsonify({
-                                   "error": "Image upload to Google Cloud Storage failed. Check server logs for details from uploader."}), 500
+                    "error": "Image upload to Google Cloud Storage failed. Check server logs for details from uploader."}), 500
 
         except Exception as e:
             print(f"An error occurred in the /upload route: {e}")
@@ -142,6 +169,23 @@ def upload_endpoint():
 @app.route("/upload_photo")
 def upload_photo():
     return render_template("upload_photo.html")
+
+
+@app.route('/get_dynamsoft_license', methods=["GET"])
+def get_dynamsoft_license():
+    allowed_referers = [
+        "http://karmasarelaxingthought.tech",
+        "https://karmasarelaxingthought.tech",
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+    ]
+    referer = request.headers.get("Referer")
+    print("referer: " + referer)
+
+    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
+        return jsonify({"error": "Unauthorized access"}), 403
+
+    return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
 
 
 if __name__ == "__main__":

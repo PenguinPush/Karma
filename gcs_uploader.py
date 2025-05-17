@@ -167,6 +167,11 @@ def upload_image_stream_to_gcs_for_user(
         return None
 
 
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
+
+
 # --- Example Usage ---
 if __name__ == "__main__":
     # --- Configuration for Testing ---
