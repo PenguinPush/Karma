@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from pymongo import MongoClient
 import re
 from user import User
@@ -14,6 +14,12 @@ client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
 db = client["karma"]
 users_collection = db["users"]
 
+
+@app.before_request
+def redirect_to_https():  # redirecting to https is needed for camera functionality
+    if 'DYNO' in os.environ and request.headers.get('X-Forwarded-Proto', 'http') != 'https':
+        url = request.url.replace('http://', 'https://', 1)
+        return redirect(url, code=301)
 
 @app.route("/")
 def index():
@@ -38,15 +44,23 @@ def url_to_user():
         fetched_user = User.get_user(users_collection, jamhacks_code)
 
         name, socials = get_jamhacks_data(jamhacks_code)
-        user = User(
-            jamhacks_code,
-            name,
-            socials,
-            fetched_user.karma,
-            fetched_user.friends,
-            fetched_user.quests,
-            fetched_user.id()
-        )
+        if fetched_user:
+            user = User(
+                jamhacks_code,
+                name,
+                socials,
+                fetched_user.karma,
+                fetched_user.friends,
+                fetched_user.quests,
+                fetched_user.photos,
+                fetched_user.id()
+            )
+        else:
+            user = User(
+                jamhacks_code,
+                name,
+                socials
+            )
 
         user.save_to_db(users_collection)
 
@@ -56,6 +70,11 @@ def url_to_user():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/scan_qr")
+def scan_qr():
+    return render_template("scan_qr.html")
 
 
 if __name__ == "__main__":

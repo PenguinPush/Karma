@@ -11,7 +11,7 @@ def get_jamhacks_data(jamhacks_code):
     print("loading!")
     load_dotenv()
 
-    base_url = "https://app.jamhacks.ca"
+    base_url = "https://app.jamhacks.ca/social/"
     socials_url = "https://app.jamhacks.ca/social/" + str(jamhacks_code)
 
     firefox_options = Options()
