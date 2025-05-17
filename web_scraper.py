@@ -7,7 +7,6 @@ from selenium.webdriver.chrome.options import Options
 import os
 from dotenv import load_dotenv
 
-
 def get_jamhacks_data(jamhacks_code):
     print("loading!")
     load_dotenv()
@@ -21,32 +20,17 @@ def get_jamhacks_data(jamhacks_code):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
 
-<<<<<<< HEAD
-        context = browser.new_context()
-        page = context.new_page()
-        page.context.add_cookies([{
-=======
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(base_url)
 
     try:
         driver.add_cookie({
->>>>>>> parent of 65d6f3d (switched from selenium to playwright)
             "name": "__Secure-next-auth.session-token",
             "value": os.getenv("__SECURE_NEXT_AUTH_SESSION_TOKEN"),
             "domain": "app.jamhacks.ca",
             "path": "/",
             "secure": True,
             "httpOnly": True
-<<<<<<< HEAD
-        }])
-        page.goto(socials_url)
-
-        name = page.locator("h1").text_content()
-        print(name)
-
-        socials = [p.text_content() for p in page.locator("p").all() if p.text_content()]
-=======
         })
     except Exception as e:
         print(f"failed to set cookie: {e}")
@@ -64,17 +48,11 @@ def get_jamhacks_data(jamhacks_code):
             EC.presence_of_all_elements_located((By.TAG_NAME, "p"))
         )
         socials = [social.text for social in social_elements if len(social.text) != 0]
->>>>>>> parent of 65d6f3d (switched from selenium to playwright)
         print(socials)
 
         return name, socials
-<<<<<<< HEAD
 
-
-# get_jamhacks_data(536930711647551488)
-=======
     except Exception as e:
         print(f"Error: {e}")
     finally:
         driver.quit()
->>>>>>> parent of 65d6f3d (switched from selenium to playwright)
