@@ -1,10 +1,15 @@
 import os
+import uuid
+
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect
 from pymongo import MongoClient
 import re
 from user import User
 from web_scraper import get_jamhacks_data
+from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS
+from werkzeug.utils import secure_filename
+
 
 load_dotenv()
 
@@ -13,6 +18,11 @@ app = Flask(__name__)
 client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
 db = client["karma"]
 users_collection = db["users"]
+
+def allowed_file(filename):
+    """Checks if the file's extension is allowed."""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
 
 
 @app.before_request
@@ -77,29 +87,57 @@ def scan_qr():
     return render_template("scan_qr.html")
 
 
-@app.route("/upload_photo", methods=["POST"])
-def upload_photo():
-    image_data = request.files['image'].read()
+@app.route('/upload', methods=['POST'])
+def upload_image_webhook():
+    if 'image_file' not in request.files:
+        return jsonify({"error": "No image file part in the request."}), 400
 
-    return jsonify({"message": "Image received successfully"})
+    file = request.files['image_file']  # This is a FileStorage object (stream-like)
+    user_id = request.form.get('user_id')
 
+    if not user_id:
+        return jsonify({"error": "User ID is required."}), 400
 
-@app.route('/get_dynamsoft_license', methods=["GET"])
-def get_license():
-    allowed_referers = [
-        "http://karmasarelaxingthought.tech",
-        "https://karmasarelaxingthought.tech",
-        "http://127.0.0.1",
-        "https://127.0.0.1",
-    ]
-    referer = request.headers.get("Referer")
-    print("referer: " + referer)
+    if file.filename == '':
+        return jsonify({"error": "No image selected for uploading."}), 400
 
-    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
-        return jsonify({"error": "Unauthorized access"}), 403
+    if file and allowed_file(file.filename):
+        original_filename = secure_filename(file.filename)
 
-    return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
+        gcs_uri = None
+        try:
+            # No local save: pass the file stream (file object from request.files) directly
+            # Also pass the original filename for extension checking and naming in GCS
+            # The content_type can be obtained from the FileStorage object
+            print(f"Calling GCS stream uploader for user_id_folder: {user_id}, original filename: {original_filename}")
+            gcs_uri = upload_image_stream_to_gcs_for_user(
+                file_stream=file,  # Pass the stream directly
+                original_filename=original_filename,
+                user_id_folder=user_id,
+                content_type=file.content_type  # Pass content type from Flask's FileStorage
+            )
 
+            if gcs_uri:
+                print(f"Successfully uploaded to GCS: {gcs_uri}")
+                return jsonify({
+                    "message": f"Image '{original_filename}' streamed and uploaded successfully for user '{user_id}'.",
+                    "gcs_uri": gcs_uri
+                }), 200
+            else:
+                # upload_image_stream_to_gcs_for_user should print its own errors
+                print("GCS stream upload function returned None.")
+                return jsonify({
+                                   "error": "Image upload to Google Cloud Storage failed. Check server logs for details from uploader."}), 500
+
+        except Exception as e:
+            print(f"An error occurred in the /upload route: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
+        # No 'finally' block to remove a local temp file, as we are not creating one here.
+    else:
+        allowed_ext_str = ", ".join(sorted([ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS]))
+        return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
 
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5000))
