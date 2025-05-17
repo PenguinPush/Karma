@@ -46,12 +46,12 @@ def redirect_to_https():  # redirecting to https is needed for camera functional
         return redirect(url, code=301)
 
 
-@app.before_request
-def check_user_session():
-    if request.endpoint not in ['login', 'static', 'scan_qr']:
-        user_session = request.cookies.get('user_session')
-        if not user_session:
-            return redirect('/login')
+# @app.before_request
+# def check_user_session():
+#     if request.endpoint not in ['login', 'static', 'scan_qr']:
+#         user_session = request.cookies.get('user_session')
+#         if not user_session:
+#             return redirect('/login')
 
 
 @app.route("/")
@@ -167,6 +167,24 @@ def upload_endpoint():
 @app.route("/upload_photo")
 def upload_photo():
     return render_template("upload_photo.html")
+
+
+@app.route('/get_dynamsoft_license', methods=["GET"])
+def get_license():
+    allowed_referers = [
+        "http://karmasarelaxingthought.tech",
+        "https://karmasarelaxingthought.tech",
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+    ]
+    referer = request.headers.get("Referer")
+    print("referer: " + referer)
+
+    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
+        return jsonify({"error": "Unauthorized access"}), 403
+
+    return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
+
 
 
 if __name__ == "__main__":
