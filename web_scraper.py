@@ -7,11 +7,17 @@ from selenium.webdriver.firefox.options import Options
 import os
 from dotenv import load_dotenv
 
-driver = None
-
 
 class Scraper:
-    def __init__(self):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Scraper, cls).__new__(cls)
+            cls._instance._initialize_driver()
+        return cls._instance
+
+    def _initialize_driver(self):
         firefox_options = Options()
         firefox_options.add_argument("--headless")
         firefox_options.add_argument("--disable-gpu")
@@ -39,7 +45,7 @@ class Scraper:
         print("loading!")
         load_dotenv()
 
-        print(driver)
+        print(self.driver)
         self.driver.get("https://app.jamhacks.ca/social/" + str(jamhacks_code))
 
         try:
