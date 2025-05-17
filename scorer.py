@@ -1,4 +1,4 @@
-# activity_scorer.py
+#scorer.py
 import os
 import openai
 from dotenv import load_dotenv
