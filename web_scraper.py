@@ -4,6 +4,7 @@ from playwright.sync_api import sync_playwright
 
 
 def get_jamhacks_data(jamhacks_code):
+    print("loading!")
     load_dotenv()
 
     base_url = "https://app.jamhacks.ca"
@@ -21,14 +22,9 @@ def get_jamhacks_data(jamhacks_code):
                 "--single-process",
             ]
         )
-        print("browser = p.chromium.launch(")
 
         context = browser.new_context()
-        print("context = browser.new_context()")
-
         page = context.new_page()
-        print("page = context.new_page()")
-
         page.context.add_cookies([{
             "name": "__Secure-next-auth.session-token",
             "value": os.getenv("__SECURE_NEXT_AUTH_SESSION_TOKEN"),
@@ -37,10 +33,7 @@ def get_jamhacks_data(jamhacks_code):
             "secure": True,
             "httpOnly": True
         }])
-        print("page.context.add_cookies([{")
-
         page.goto(socials_url)
-        print("page.goto(socials_url)")
 
         name = page.locator("h1").text_content()
         print(name)
