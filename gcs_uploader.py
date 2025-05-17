@@ -8,34 +8,19 @@ import json  # For parsing JSON string from environment variable
 # Import Google Cloud Storage client library
 # and google.auth components separately for better error handling
 storage = None
-google_auth = None  # For google.auth.exceptions
-google_oauth2_service_account = None  # For explicit loading
-google_auth_exceptions = None
 
-try:
-    from google.cloud import storage
-except ImportError:
-    print("Error: google-cloud-storage library not found. Please install it: pip install google-cloud-storage")
+from google.cloud import storage
 
-try:
-    import google.auth
+import google.auth
 
-    google_auth = google.auth
-    from google.oauth2 import service_account as oauth2_service_account
+google_auth = google.auth
+from google.oauth2 import service_account as oauth2_service_account
 
-    google_oauth2_service_account = oauth2_service_account
-except ImportError:
-    print(
-        "Error: google-auth or google.oauth2.service_account library not found. Please install it: pip install google-auth")
+google_oauth2_service_account = oauth2_service_account
 
-try:
-    if google_auth:
-        import google.auth.exceptions
+import google.auth.exceptions
 
-        google_auth_exceptions = google.auth.exceptions
-except ImportError:
-    print(
-        "Error: google.auth.exceptions module not found. This might indicate an issue with the google-auth installation.")
+google_auth_exceptions = google.auth.exceptions
 
 load_dotenv()
 
@@ -43,19 +28,10 @@ ALLOWED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.
 
 
 def _get_gcs_credentials_and_project():
-    """
-    Helper function to load GCS credentials and project ID from a JSON string
-    stored in the GOOGLE_APPLICATION_CREDENTIALS environment variable.
-    Returns a tuple (credentials, project_id) or (None, None) on failure.
-    """
-    if not google_oauth2_service_account:
-        print("google.oauth2.service_account module not available. Cannot load credentials.")
-        return None, None
+
 
     google_app_creds_json_string = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if not google_app_creds_json_string:
-        print("Error: GOOGLE_APPLICATION_CREDENTIALS environment variable not set or is empty.")
-        return None, None
+
 
     try:
         # Parse the JSON string from the environment variable
@@ -80,11 +56,8 @@ def _get_gcs_credentials_and_project():
 
         return credentials, project_id_from_creds
 
-    except json.JSONDecodeError as e:
-        print(f"Error: GOOGLE_APPLICATION_CREDENTIALS is not a valid JSON string: {e}")
-        return None, None
     except Exception as e:
-        print(f"Error loading credentials from service account info: {e}")
+        print(f"Error {e}")
         return None, None
 
 
@@ -95,23 +68,7 @@ def upload_image_stream_to_gcs_for_user(
         bucket_name: str = "karma-videos",
         content_type: str | None = None
 ) -> str | None:
-    """
-    Uploads an image from a file stream to a user-specific folder in GCS.
 
-    Args:
-        file_stream: The file stream object (e.g., from Flask request.files['image_file']).
-        original_filename: The original name of the file, used for extension and base name.
-        user_id_folder: The name of the folder (derived from user ID) in GCS.
-        bucket_name: The name of the GCS bucket.
-        content_type: The content type (MIME type) of the file. If None, it will be
-                      guessed from original_filename if possible.
-
-    Returns:
-        The GCS URI of the uploaded image, or None if upload failed.
-    """
-    if not storage:
-        print("Google Cloud Storage library not available. Cannot upload.")
-        return None
 
     # Validate file extension from original_filename
     _, file_extension = os.path.splitext(original_filename)
@@ -145,14 +102,14 @@ def upload_image_stream_to_gcs_for_user(
         if content_type is None:
             content_type, _ = mimetypes.guess_type(original_filename)
             if content_type:
-                print(f"Guessed content type: {content_type}")
+                print(f"guessed content type: {content_type}")
 
-        print(f"Uploading stream for '{original_filename}' to gs://{bucket_name}/{gcs_object_name}...")
+        print(f"uploading stream for '{original_filename}' to gs://{bucket_name}/{gcs_object_name}...")
         file_stream.seek(0)  # Ensure the stream is at the beginning before upload
         blob.upload_from_file(file_stream, content_type=content_type)
 
         gcs_uri = f"gs://{bucket_name}/{gcs_object_name}"
-        print(f"Image uploaded successfully from stream to {gcs_uri}")
+        print(f"image uploaded successfully from stream to {gcs_uri}")
         return gcs_uri
 
     except (google_auth_exceptions.GoogleAuthError if google_auth_exceptions else Exception) as e:
@@ -161,7 +118,7 @@ def upload_image_stream_to_gcs_for_user(
         traceback.print_exc()
         return None
     except Exception as e:
-        print(f"An error occurred during GCS stream upload: {e}")
+        print(f"An error occurred during gcs stream upload: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -229,9 +186,4 @@ if __name__ == "__main__":
                     print(f"Error cleaning up dummy image '{dummy_image_filename_for_stream_test}': {e_remove}")
     elif dummy_image_filename_for_stream_test:
         print(f"Test image specified ('{dummy_image_filename_for_stream_test}') but not found. Skipping upload test.")
-    else:
-        print("Could not proceed with example usage as the test image was not available.")
-
-    print("\nReminder: For this script to work, the GOOGLE_APPLICATION_CREDENTIALS environment variable")
-    print("must contain the *actual JSON string* of your service account key, not a path to the file.")
 

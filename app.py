@@ -177,7 +177,7 @@ def upload_endpoint():
         return jsonify({"error": "No image file part in the request."}), 400
 
     file = request.files['image_file']
-    user_id_str = request.form.get('user_id')  # This is the uploader's user_id string
+    user_id_str = request.form.get('user_id')
 
     if not user_id_str:
         return jsonify({"error": "User ID (uploader_user_id) is required."}), 400
@@ -205,7 +205,6 @@ def upload_endpoint():
 
             print(f"Successfully uploaded to GCS: {gcs_uri}")
 
-            # --- Start of new integration ---
             print("\nStep 1 (Flask): Getting image labels from Image_recognizer...")
             image_labels_dict = get_image_labels_and_entities(gcs_uri)
 
@@ -242,7 +241,6 @@ def upload_endpoint():
 
             print(f"Karma Points Calculated: {karma_points_info}")
 
-            # --- Directly update user data in MongoDB ---
             current_user_karma = "User not found or karma not updated"
             try:
                 user_object_id = ObjectId(user_id_str)  # Convert user_id string to ObjectId
@@ -255,7 +253,6 @@ def upload_endpoint():
                 )
                 if update_result.matched_count > 0:
                     print(f"User {user_id_str}'s karma and photos updated in MongoDB.")
-                    # Fetch the updated karma to return (optional, adds a read)
                     updated_user_doc = users_collection.find_one({"_id": user_object_id}, {"karma": 1})
                     if updated_user_doc:
                         current_user_karma = updated_user_doc.get("karma", "Could not fetch updated karma")
@@ -266,7 +263,6 @@ def upload_endpoint():
             except Exception as e_db_update:
                 print(f"Error updating user {user_id_str} in MongoDB: {e_db_update}")
                 current_user_karma = "Error during karma update"
-            # --- End of direct MongoDB update ---
 
             return jsonify({
                 "message": f"Image '{original_filename}' processed successfully for user '{user_id_str}'.",
