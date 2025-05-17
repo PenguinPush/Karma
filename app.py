@@ -87,8 +87,8 @@ def scan_qr():
     return render_template("scan_qr.html")
 
 
-@app.route('/upload', methods=['POST'])
-def upload_image_webhook():
+@app.route('/upload_endpoint', methods=['POST'])
+def upload_endpoint():
     if 'image_file' not in request.files:
         return jsonify({"error": "No image file part in the request."}), 400
 
@@ -138,6 +138,12 @@ def upload_image_webhook():
     else:
         allowed_ext_str = ", ".join(sorted([ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS]))
         return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
+
+
+@app.route("/upload_endpoint")
+def upload_endpoint():
+    return render_template("upload_photo.html")
+
 
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5000))

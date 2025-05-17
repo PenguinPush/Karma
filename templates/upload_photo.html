@@ -2,9 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Image</title>
 </head>
 <body>
-
+    <h1>Upload Image</h1>
+    <form action="/upload_endpoint" method="POST" enctype="multipart/form-data">
+        <label for="user_id">User ID:</label>
+        <input type="text" id="user_id" name="user_id" required>
+        <br><br>
+        <label for="image_file">Image File:</label>
+        <input type="file" id="image_file" name="image_file" accept="image/*" required>
+        <br><br>
+        <button type="submit">Upload</button>
+    </form>
 </body>
 </html>
