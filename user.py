@@ -57,6 +57,13 @@ class User:
         return None
 
     @staticmethod
+    def get_user_by_id(collection, mongo_id):
+        data = collection.find_one({"_id": mongo_id})
+        if data:
+            return User.from_mongo(data)
+        return None
+
+    @staticmethod
     def get_all_users(collection):
         users = collection.find()
         return [User.from_mongo(user) for user in users]
