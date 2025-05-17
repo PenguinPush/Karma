@@ -8,9 +8,9 @@ class User:
         self.socials = socials if socials else []
         self.karma = karma
         self.phone = phone
-        self.friends = friends if friends else [] # store as list of objectid pointers
+        self.friends = friends if friends else []  # store as list of objectid pointers
         self.quests = quests if quests else []
-        self.photos = photos if photos else [] # list of pointers to google cloud
+        self.photos = photos if photos else []  # list of pointers to google cloud
         self._id = _id
 
     def to_mongo(self):

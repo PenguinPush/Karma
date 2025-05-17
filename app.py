@@ -9,7 +9,6 @@ from web_scraper import get_jamhacks_data
 from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS, allowed_file
 from werkzeug.utils import secure_filename
 
-
 load_dotenv()
 
 app = Flask(__name__)
@@ -48,14 +47,11 @@ def redirect_to_https():  # redirecting to https is needed for camera functional
 
 @app.before_request
 def check_user_session():
-    if request.endpoint not in ['login',
-                                'static',
-                                'scan_qr',
-                                "get_dynamsoft_license",
-                                "url_to_user"]:
+    if request.endpoint in ["index"]:
         user_session = request.cookies.get('user_session')
         if not user_session:
-            print("redirecting, user not logged in!!" + request.endpoint)
+            if request.endpoint:
+                print("redirecting, user not logged in!!" + request.endpoint)
             return redirect('/login')
 
 
@@ -80,6 +76,7 @@ def url_to_user():
         print(match.group(1))
         jamhacks_code = match.group(1)
         fetched_user = User.get_user(users_collection, jamhacks_code)
+        print(fetched_user)
 
         name, socials = get_jamhacks_data(jamhacks_code)
         if fetched_user:
@@ -156,7 +153,7 @@ def upload_endpoint():
                 # upload_image_stream_to_gcs_for_user should print its own errors
                 print("GCS stream upload function returned None.")
                 return jsonify({
-                                   "error": "Image upload to Google Cloud Storage failed. Check server logs for details from uploader."}), 500
+                    "error": "Image upload to Google Cloud Storage failed. Check server logs for details from uploader."}), 500
 
         except Exception as e:
             print(f"An error occurred in the /upload route: {e}")
@@ -189,7 +186,6 @@ def get_dynamsoft_license():
         return jsonify({"error": "Unauthorized access"}), 403
 
     return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
-
 
 
 if __name__ == "__main__":

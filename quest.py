@@ -27,7 +27,7 @@ class Quest:
 
     @staticmethod
     def from_mongo(data):
-        return User(
+        return Quest(
             jamhacks_code=data["jamhacks_code"],
             name=data["name"],
             socials=data["socials"],
@@ -53,13 +53,13 @@ class Quest:
     def get_user(collection, jamhacks_code):
         data = collection.find_one({"jamhacks_code": jamhacks_code})
         if data:
-            return User.from_mongo(data)
+            return Quest.from_mongo(data)
         return None
 
     @staticmethod
     def get_all_users(collection):
         users = collection.find()
-        return [User.from_mongo(user) for user in users]
+        return [Quest.from_mongo(user) for user in users]
 
     def id(self):
         return self._id
