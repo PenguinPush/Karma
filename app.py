@@ -28,23 +28,24 @@ db = client["karma"]
 users_collection = db["users"]
 
 
+def get_user_session():
+    return request.cookies.get('user_session')
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Handle API request
         data = request.json
         if not data or "user_id" not in data:
             return jsonify({"error": "user_id is required"}), 400
 
         user_id = data["user_id"]
 
-        # Set the session cookie with the user ID
         response = make_response(redirect('/'))
         response.set_cookie('user_session', user_id)
 
         return response
 
-    # Render the login page for GET requests or browser access
     return render_template('login.html')
 
 
@@ -72,7 +73,7 @@ def check_user_session():
         "scan_qr",
         "get_dynamsoft_license"
     ]:
-        user_session = request.cookies.get('user_session')
+        user_session = get_user_session()
         if not user_session:
             if request.endpoint:
                 print("redirecting, user not logged in!!" + request.endpoint)

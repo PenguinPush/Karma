@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        #scanner {
+            position: relative;
+            width: calc(100% - 20px);
+            margin: 10px;
+            height: calc(100vh - 20px);
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@10.5.3000/dist/dbr.bundle.js"></script>
+</head>
+<body>
+<h1 id="message">creating a new user, please wait a moment!!</h1>
+<div id="scanner"></div>
+
+<script>
+    fetch('/get_dynamsoft_license')
+        .then(response => response.json())
+        .then(data => {
+            const DYNAMSOFT_LICENSE = data.license;
+
+            const barcodeScanner = new Dynamsoft.BarcodeScanner({
+                license: DYNAMSOFT_LICENSE,
+                container: document.getElementById('scanner')
+            });
+
+
+            (async () => {
+                try {
+
+                    const result = await barcodeScanner.launch();
+                    const scannedUrl = result.barcodeResults[0].text;
+
+                    // Send the scanned URL to the /url_to_user endpoint
+                    const urlToUserResponse = await fetch('/url_to_user', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({url: scannedUrl})
+                    });
+
+                    if (!urlToUserResponse.ok) {
+                        throw new Error(`Error from /url_to_user: ${urlToUserResponse.status}`);
+                    }
+
+                    const urlToUserData = await urlToUserResponse.json();
+                    const userId = urlToUserData.user_id;
+                    const newUser = urlToUserData.new_user;
+
+                    if (!newUser) {
+                        document.getElementById("message").innerHTML = "signed in! redirecting...";
+                    }
+
+                    // Send the user ID to the /login endpoint to set the session cookie
+                    const loginResponse = await fetch('/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({user_id: userId})
+                    });
+
+                    if (!loginResponse.ok) {
+                        throw new Error(`Error from /login: ${loginResponse.status}`);
+                    }
+
+                    // Redirect to the home page after successful login
+                    window.location.href = '/';
+                } catch (error) {
+                    console.error('Login failed:', error);
+                    alert('Login failed. Please try again.');
+                }
+            })();
+        });
+</script>
+</body>
+</html>
