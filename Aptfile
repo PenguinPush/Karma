@@ -11,3 +11,8 @@ libsecret-1-0
 libhyphen0
 libmanette-0.2-0
 libgles2-mesa
+libgstgl-1.0-0
+libgstcodecparsers-1.0-0
+libcairo2
+libcairo-gobject2
+libcairo-script-interpreter2
