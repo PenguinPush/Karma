@@ -1,6 +1,11 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+
 import os
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
 
 
 def get_jamhacks_data(jamhacks_code):
@@ -8,30 +13,32 @@ def get_jamhacks_data(jamhacks_code):
     load_dotenv()
 
     base_url = "https://app.jamhacks.ca"
-    socials_url = f"{base_url}/social/{jamhacks_code}"
+    socials_url = "https://app.jamhacks.ca/social/" + str(jamhacks_code)
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--no-zygote",
-                "--single-process",
-            ]
-        )
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
 
+<<<<<<< HEAD
         context = browser.new_context()
         page = context.new_page()
         page.context.add_cookies([{
+=======
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(base_url)
+
+    try:
+        driver.add_cookie({
+>>>>>>> parent of 65d6f3d (switched from selenium to playwright)
             "name": "__Secure-next-auth.session-token",
             "value": os.getenv("__SECURE_NEXT_AUTH_SESSION_TOKEN"),
             "domain": "app.jamhacks.ca",
             "path": "/",
             "secure": True,
             "httpOnly": True
+<<<<<<< HEAD
         }])
         page.goto(socials_url)
 
@@ -39,10 +46,35 @@ def get_jamhacks_data(jamhacks_code):
         print(name)
 
         socials = [p.text_content() for p in page.locator("p").all() if p.text_content()]
+=======
+        })
+    except Exception as e:
+        print(f"failed to set cookie: {e}")
+
+    driver.get(socials_url)
+
+    try:
+        name_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "h1"))
+        )
+        name = name_element.text
+        print(name)
+
+        social_elements = WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((By.TAG_NAME, "p"))
+        )
+        socials = [social.text for social in social_elements if len(social.text) != 0]
+>>>>>>> parent of 65d6f3d (switched from selenium to playwright)
         print(socials)
 
-        browser.close()
         return name, socials
+<<<<<<< HEAD
 
 
 # get_jamhacks_data(536930711647551488)
+=======
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        driver.quit()
+>>>>>>> parent of 65d6f3d (switched from selenium to playwright)
