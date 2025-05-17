@@ -4,53 +4,21 @@ import openai
 from dotenv import load_dotenv
 import json
 
-# Load environment variables from .env file
-# Ensure your .env file has OPENAI_API_KEY defined
 load_dotenv()
 
-# Attempt to import necessary functions from other files
-try:
-    # This function is expected to be in image_recognizer.py and
-    # return a dict: {'label_description_lower': score}
-    from image_recognizer import get_image_labels_and_entities
-except ImportError:
-    print("Error: Could not import 'get_image_labels_and_entities' from 'image_recognizer.py'.")
-    print("Please ensure 'image_recognizer.py' exists and contains this function for the example usage.")
+
+from image_recognizer import get_image_labels_and_entities
+
+from classifier import get_description
+from classifier import classify
 
 
-    def get_image_labels_and_entities(gcs_image_uri: str) -> dict[str, float]:  # Placeholder
-        print("Placeholder: Real 'get_image_labels_and_entities' not found.")
-        return {"error": "image_recognizer.py or its function not found."}
-
-try:
-    # This function is expected to be in classifier.py
-    # and return a string description.
-    from classifier import get_description
-    # This function is also expected to be in classifier.py and returns a category string
-    from classifier import classify
-except ImportError:
-    print("Error: Could not import functions from 'classifier.py'.")
-    print(
-        "Please ensure 'classifier.py' exists and contains 'get_description' and 'classify_good_samaritan_activity_from_description_and_labels'.")
-
-
-    def get_description(detected_labels: list[str], model_name: str = "gpt-4o") -> str | None:  # Placeholder
-        print("Placeholder: Real 'get_description' not found.")
-        return "Activity description could not be generated."
-
-
-
-# Initialize the OpenAI client
-# The client will automatically look for the OPENAI_API_KEY environment variable
 try:
     openai_client = openai.OpenAI()
 except openai.OpenAIError as e:
-    print(f"Error initializing OpenAI client: {e}")
-    print("Please ensure your OPENAI_API_KEY environment variable is set correctly.")
+    print(f"error initializing openaoi client: {e}")
     openai_client = None
-except Exception as e_general_openai:  # Catch any other potential errors during init
-    print(f"A general error occurred initializing OpenAI client: {e_general_openai}")
-    openai_client = None
+
 
 # Define the structure for the scoring output
 SCORING_TOOL_NAME = "set_societal_benefit_score"
@@ -78,29 +46,13 @@ def get_score(
         classified_good_samaritan_category: str | None = None,  # New parameter
         model_name: str = "gpt-4o"
 ) -> dict[str, int | str] | None:
-    """
-    Uses OpenAI to generate a societal benefit score (0-20) and reasoning
-    for a given activity description, optional supporting labels, and an optional
-    pre-classified Good Samaritan category.
 
-    Args:
-        activity_description: A natural language description of the activity.
-        detected_labels: An optional list of strings, where each string is a label
-                         detected in an image related to the activity.
-        classified_good_samaritan_category: An optional string representing the
-                                            pre-classified Good Samaritan category.
-        model_name: The OpenAI model to use. Defaults to "gpt-4o".
-
-    Returns:
-        A dictionary containing "score" (int) and "reasoning" (str),
-        or None if scoring fails or an error occurs.
-    """
     if not openai_client:
-        print("OpenAI client not initialized. Cannot proceed with scoring.")
+        print("openai client not initialized")
         return None
 
     if not activity_description:
-        print("No activity description provided for scoring.")
+        print("no activity description provided for scoring")
         return {"score": 0, "reasoning": "No activity description provided."}
 
     tools = [
@@ -150,8 +102,8 @@ def get_score(
     )
 
     print(f"\nSending request to OpenAI model ({model_name}) for societal benefit scoring...")
-    # print(f"System Prompt for Scorer: {prompt_system}") # For debugging
-    # print(f"User Prompt for Scorer: {prompt_user}") # For debugging
+    # print(f"System Prompt for Scorer: {prompt_system}")
+    # print(f"User Prompt for Scorer: {prompt_user}")
 
     try:
         completion = openai_client.chat.completions.create(
@@ -185,26 +137,25 @@ def get_score(
                             f"Warning: Tool call returned invalid score/reasoning: {function_args}. Score must be int 0-20.")
                         return {"score": 0, "reasoning": "Invalid score or reasoning format from AI."}
                 except json.JSONDecodeError:
-                    print(f"Error: Tool call arguments were not valid JSON: {tool_call.function.arguments}")
-                    return {"score": 0, "reasoning": "AI response for arguments was not valid JSON."}
+                    print(f"Error: tool call arguments were not valid json: {tool_call.function.arguments}")
+                    return {"score": 0, "reasoning": "ai response for arguments was not valid json."}
             else:
-                print(f"Error: Unexpected tool called: {tool_call.function.name}")
-                return {"score": 0, "reasoning": "AI called an unexpected tool."}
+                print(f"rrror: unexpected tool called: {tool_call.function.name}")
+                return {"score": 0, "reasoning": "ai called an unexpected tool."}
         else:
-            print(f"Warning: Model did not make a tool call as expected. Raw content: '{response_message.content}'")
-            return {"score": 0, "reasoning": "AI did not make the expected tool call."}
+            print(f"warning: model did not make a tool call as expected. raw content: '{response_message.content}'")
+            return {"score": 0, "reasoning": "ai did not make the expected tool call."}
 
     except openai.APIError as e:
-        print(f"OpenAI API Error during scoring: {e}")
+        print(f"openai api Error during scoring: {e}")
         return None
     except Exception as e:
-        print(f"An unexpected error occurred during OpenAI scoring: {e}")
+        print(f"An unexpected error occurred during opneai scoring: {e}")
         import traceback
         traceback.print_exc()
         return None
 
 
-# --- Example Usage ---
 if __name__ == "__main__":
     gcs_image_uri_for_scoring = "gs://karma-videos/recycle.png"
 
@@ -264,10 +215,3 @@ if __name__ == "__main__":
             else:
                 print(
                     f"\nCould not determine societal benefit score for the activity from '{gcs_image_uri_for_scoring}'.")
-
-    print(
-        "\n\nNote: This script uses OpenAI to assign a societal benefit score based on an activity description and pre-classification.")
-    print("      Ensure all necessary API keys and credentials are set in your .env file.")
-    print(
-        "      Also, ensure 'image_recognizer.py' and 'classifier.py' (containing 'get_description' and 'classify_good_samaritan_activity_from_description_and_labels') are in the same directory or accessible in PYTHONPATH.")
-
