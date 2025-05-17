@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from pymongo import MongoClient
 import re
 from user import User
@@ -14,6 +14,12 @@ client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
 db = client["karma"]
 users_collection = db["users"]
 
+
+@app.before_request
+def redirect_to_https():  # redirecting to https is needed for camera functionality
+    if 'DYNO' in os.environ and request.headers.get('X-Forwarded-Proto', 'http') != 'https':
+        url = request.url.replace('http://', 'https://', 1)
+        return redirect(url, code=301)
 
 @app.route("/")
 def index():
