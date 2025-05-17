@@ -38,8 +38,8 @@ def get_image_labels_and_entities(gcs_image_uri: str) -> dict[str, float]:
         image.source.image_uri = gcs_image_uri
 
         features = [
-            {"type_": vision.Feature.Type.LABEL_DETECTION, "max_results": 30},  # Get more labels
-            {"type_": vision.Feature.Type.OBJECT_LOCALIZATION, "max_results": 30},  # Get more localized objects
+            {"type_": vision.Feature.Type.LABEL_DETECTION, "max_results": 4},  # Get more labels
+            {"type_": vision.Feature.Type.OBJECT_LOCALIZATION, "max_results": 3},  # Get more localized objects
             {"type_": vision.Feature.Type.WEB_DETECTION, "max_results": 30}  # Get more web entities and guesses
         ]
 
