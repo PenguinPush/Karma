@@ -241,7 +241,7 @@ if __name__ == "__main__":
                 activity_description_from_ai,
                 labels_for_openai_processing
             )
-            if not good_samaritan_category:
+            if good_samaritan_category is None:
                 print("Could not determine Good Samaritan category. Proceeding without this context for scoring.")
                 good_samaritan_category = "No Specific Good Samaritan Activity Detected"  # Default
             else:
