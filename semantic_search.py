@@ -1,19 +1,20 @@
 # semantic_search.py
 import os
-import openai  # For embeddings and potentially scorer
+import openai  # For embeddings and scorer
 from dotenv import load_dotenv
 from pymongo import MongoClient, UpdateOne
 from pymongo.collection import Collection
 from bson.objectid import ObjectId  # If you store a unique _id for embeddings
-from sentence_transformers import SentenceTransformer  # For creating embeddings
-import numpy as np  # Still used by sentence_transformers internally
+# SentenceTransformer is no longer needed
+# from sentence_transformers import SentenceTransformer
+import numpy as np  # OpenAI embeddings are lists of floats, numpy might not be directly needed here
 import datetime  # For timestamping new embeddings
 import certifi  # For SSL certificate verification with MongoDB Atlas
 
 # Imports - Assuming these files and functions exist and are importable
 # The script will raise ImportError if they are not found.
 from scorer import get_score
-from image_recognizer import get_image_labels_and_entities  # Corrected filename based on user's last code
+from image_recognizer import get_image_labels_and_entities # Corrected filename based on user's last code
 from classifier import get_description
 from classifier import classify
 
@@ -28,18 +29,18 @@ MONGO_URI = os.getenv("MONGO_CONNECTION_STRING")
 DB_NAME = "karma"
 EMBEDDINGS_COLLECTION_NAME = "vectors"
 ATLAS_VECTOR_SEARCH_INDEX_NAME = "vector_index"
-OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
+OPENAI_EMBEDDING_MODEL = "text-embedding-3-large" # Using the model specified by the user
 
 print("a")  # From user's provided code; keeping it as requested.
-SIMILARITY_THRESHOLD = 0.80
+SIMILARITY_THRESHOLD = 0.80 # User specified 0.80. Note: OpenAI embedding similarity scores might behave differently.
 
 # Initialize OpenAI client
 # This will raise an exception if OPENAI_API_KEY is not set or client init fails.
 openai_client = openai.OpenAI()
 
-# Initialize Sentence Transformer model
-# This will raise an exception if 'sentence-transformers' is not installed or model download fails.
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+# SentenceTransformer model is no longer initialized here.
+# embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
 
 # --- MongoDB Connection ---
 # This will raise an exception if MONGO_URI is None or connection fails.
@@ -52,9 +53,9 @@ db = mongo_client[DB_NAME]
 embeddings_collection = db[EMBEDDINGS_COLLECTION_NAME]
 mongo_client.admin.command('ping')  # Test connection - will raise ConnectionFailure if fails
 print("MongoDB connection successful.")
-print(f"Using embeddings collection for search and storage: {DB_NAME}.{EMBEDDINGS_COLLECTION_NAME}")  # Updated print
+print(f"Using embeddings collection for search and storage: {DB_NAME}.{EMBEDDINGS_COLLECTION_NAME}")
 print(
-    f"Ensure Atlas Vector Search Index '{ATLAS_VECTOR_SEARCH_INDEX_NAME}' exists on the 'embedding' field and is configured for {OPENAI_EMBEDDING_MODEL} dimensions.")
+    f"Ensure Atlas Vector Search Index '{ATLAS_VECTOR_SEARCH_INDEX_NAME}' exists on the 'embedding' field and is configured for {OPENAI_EMBEDDING_MODEL} dimensions (e.g., 3072 for text-embedding-3-large).")
 
 
 def get_text_embedding(text: str, model: str = OPENAI_EMBEDDING_MODEL) -> list[float]:
@@ -103,7 +104,7 @@ def find_similar_embedding_in_db_atlas(query_embedding: list[float], collection:
             f"Atlas Vector Search found a match: '{best_match_doc.get('description_text', 'N/A')}' with search score: {search_score:.4f}")
 
         if search_score >= SIMILARITY_THRESHOLD:
-            print(f"Score: {search_score:.4f}")
+            print(f"Score: {search_score:.4f}") # From user's code, can be re-added if needed for debugging
             return best_match_doc
         else:
             print(f"Match found but score {search_score:.4f} is below threshold {SIMILARITY_THRESHOLD}.")
@@ -125,8 +126,8 @@ def process_activity_and_get_points(
     STORES the new embedding and points in the database.
     Will raise exceptions on errors.
     """
-    if embeddings_collection is None:
-        raise ConnectionError("Critical: MongoDB embeddings collection not initialized.")
+    if not embeddings_collection: # This check is more for logical completeness
+        raise ConnectionError("Critical: MongoDB embeddings collection not initialized (should have failed earlier if MONGO_URI was an issue).")
 
     text_for_embedding = f"Category: {activity_category}. Description: {activity_description}"
     print(f"\nText for embedding: {text_for_embedding}")
@@ -203,7 +204,7 @@ if __name__ == "__main__":
 
     print(f"\n--- Final Karma Points for '{test_gcs_image_uri}': {final_points} ---")
 
-    print("\n--- Direct Test with 'litter a bottle' ---")
+    print("\n--- Direct Test with 'litter a bottle' ---") # User's example text
     known_desc = "A person is picking up garbage found on a sidewalk"
     known_cat = "Litter Pickup"
     known_labels = ["sidewalk", "litter", "cleaning", "garbage", "city"]
@@ -223,7 +224,7 @@ if __name__ == "__main__":
     print(f"Points for '{new_activity_desc}': {points_for_new_activity}")
     print("(Check your MongoDB 'vectors' collection to see if this new entry was added if it wasn't found initially)")
 
-    if mongo_client:
+    if mongo_client: # This check remains to prevent AttributeError if mongo_client is None due to connection failure
         mongo_client.close()
         print("\nMongoDB connection closed.")
 
