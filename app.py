@@ -1,15 +1,24 @@
 import os
-
+import uuid
+from flask import Flask, request, jsonify, redirect, make_response, render_template
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, redirect, make_response
 from pymongo import MongoClient
 import re
-from user import User
-from web_scraper import get_jamhacks_data
-from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS, allowed_file
-from werkzeug.utils import secure_filename
 from bson.objectid import ObjectId
 
+from user import User # Assuming user.py is in the same directory
+from web_scraper import get_jamhacks_data # Assuming web_scraper.py is in the same directory
+
+from image_recognizer import get_image_labels_and_entities
+from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS # Keep allowed_file defined locally or import it too
+from classifier import get_description, classify
+from semantic_search import process_activity_and_get_points
+
+def allowed_file(filename):
+    """Checks if the file's extension is allowed."""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
 load_dotenv()
 
 app = Flask(__name__)
@@ -143,49 +152,109 @@ def upload_endpoint():
     if 'image_file' not in request.files:
         return jsonify({"error": "No image file part in the request."}), 400
 
-    file = request.files['image_file']  # This is a FileStorage object (stream-like)
-    user_id = request.form.get('user_id')
+    file = request.files['image_file']
+    user_id = request.form.get('user_id')  # This is the uploader's user_id
 
     if not user_id:
-        return jsonify({"error": "User ID is required."}), 400
+        return jsonify({"error": "User ID (uploader_user_id) is required."}), 400
 
     if file.filename == '':
         return jsonify({"error": "No image selected for uploading."}), 400
 
     if file and allowed_file(file.filename):
         original_filename = secure_filename(file.filename)
-
         gcs_uri = None
+
+        # Temporary local save is still used by gcs_uploader if not streaming directly
+        # If gcs_uploader is modified to stream, this local save can be removed.
+        # Based on the current gcs_uploader.py, it expects a stream.
+
         try:
-            # No local save: pass the file stream (file object from request.files) directly
-            # Also pass the original filename for extension checking and naming in GCS
-            # The content_type can be obtained from the FileStorage object
             print(f"Calling GCS stream uploader for user_id_folder: {user_id}, original filename: {original_filename}")
             gcs_uri = upload_image_stream_to_gcs_for_user(
                 file_stream=file,  # Pass the stream directly
                 original_filename=original_filename,
-                user_id_folder=user_id,
-                content_type=file.content_type  # Pass content type from Flask's FileStorage
+                user_id_folder=user_id,  # Image will be stored in a folder named after the uploader's ID
+                content_type=file.content_type
             )
 
-            if gcs_uri:
-                print(f"Successfully uploaded to GCS: {gcs_uri}")
-                return jsonify({
-                    "message": f"Image '{original_filename}' streamed and uploaded successfully for user '{user_id}'.",
-                    "gcs_uri": gcs_uri
-                }), 200
-            else:
-                # upload_image_stream_to_gcs_for_user should print its own errors
+            if not gcs_uri:
                 print("GCS stream upload function returned None.")
-                return jsonify({
-                    "error": "Image upload to Google Cloud Storage failed. Check server logs for details from uploader."}), 500
+                return jsonify({"error": "Image upload to Google Cloud Storage failed."}), 500
 
+            print(f"Successfully uploaded to GCS: {gcs_uri}")
+
+            # --- Start of new integration ---
+            print("\nStep 1 (Flask): Getting image labels from Image_recognizer...")
+            image_labels_dict = get_image_labels_and_entities(gcs_uri)
+
+            if not image_labels_dict or "error" in image_labels_dict:
+                # If Image_recognizer.py returns an error dict, propagate it
+                error_msg = image_labels_dict.get("error", "Failed to get image labels.") if isinstance(
+                    image_labels_dict, dict) else "Failed to get image labels."
+                print(f"Error from Image Recognizer: {error_msg}")
+                return jsonify({"error": f"Label extraction failed: {error_msg}", "gcs_uri": gcs_uri}), 500
+
+            formatted_labels = [f"{desc.capitalize()} (Score: {score:.2f})" for desc, score in
+                                image_labels_dict.items()]
+            print(f"Image Labels from Recognizer: {formatted_labels if formatted_labels else 'None'}")
+
+            print("\nStep 2 (Flask): Getting activity description from classifier...")
+            img_activity_description = get_description(formatted_labels)
+            if not img_activity_description:
+                # Handle case where description might be None, provide a default or error
+                print("Warning: get_description returned None. Using a default description.")
+                img_activity_description = "Activity could not be automatically described from labels."
+            print(f"Generated Activity Description: {img_activity_description}")
+
+            print("\nStep 3 (Flask): Classifying Good Samaritan category from classifier...")
+            good_samaritan_category = classify(img_activity_description, formatted_labels)
+            if not good_samaritan_category:
+                print("Warning: classify returned None. Using a default category.")
+                good_samaritan_category = "No Specific Good Samaritan Activity Detected"
+            print(f"Classified Category: {good_samaritan_category}")
+
+            print("\nStep 4 (Flask): Processing activity for karma points from semantic_search...")
+            karma_points_info = process_activity_and_get_points(  # This is from semantic_search.py
+                activity_category=good_samaritan_category,
+                activity_description=img_activity_description,
+                detected_labels=formatted_labels
+            )
+            # process_activity_and_get_points is expected to return an int or raise an error
+            # The original scorer.py's get_score returned a dict, but semantic_search adapted it.
+
+            print(f"Karma Points Calculated: {karma_points_info}")
+
+            # Update user's karma points in DB
+            # This assumes you have a User class method to update karma
+            user_obj = User.get_user_by_id(users_collection, user_id)  # Assuming you have get_user_by_id
+            if user_obj:
+                user_obj.karma += karma_points_info  # Add new points
+                user_obj.photos.append(gcs_uri)  # Add photo to user's list
+                user_obj.save_to_db(users_collection)
+                print(f"User {user_id}'s karma updated to {user_obj.karma}. Photo {gcs_uri} added.")
+            else:
+                print(f"Warning: User with ID {user_id} not found to update karma.")
+
+            return jsonify({
+                "message": f"Image '{original_filename}' processed successfully for user '{user_id}'.",
+                "gcs_uri": gcs_uri,
+                "image_labels": formatted_labels,
+                "activity_description": img_activity_description,
+                "classified_category": good_samaritan_category,
+                "karma_points_awarded": karma_points_info,
+                "user_current_karma": user_obj.karma if user_obj else "User not found"
+            }), 200
+
+        except RuntimeError as e:  # Catch specific RuntimeError from placeholder functions
+            print(f"A critical imported function is missing: {e}")
+            return jsonify({"error": f"Server configuration error: {e}"}), 500
         except Exception as e:
-            print(f"An error occurred in the /upload route: {e}")
+            print(f"An error occurred in the /upload_endpoint route: {e}")
             import traceback
             traceback.print_exc()
             return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
-        # No 'finally' block to remove a local temp file, as we are not creating one here.
+        # No 'finally' block needed to remove a local temp file if streaming directly
     else:
         allowed_ext_str = ", ".join(sorted([ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS]))
         return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
