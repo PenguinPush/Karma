@@ -77,6 +77,13 @@ def scan_qr():
     return render_template("scan_qr.html")
 
 
+@app.route("upload_photo", methods=["POST"])
+def upload_photo():
+    image_data = request.files['image'].read()
+
+    return jsonify({"message": "Image received successfully"})
+
+
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)

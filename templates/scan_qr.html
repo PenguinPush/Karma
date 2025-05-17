@@ -3,69 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>scan qr code</title>
+    <title>Scan QR Code</title>
     <style>
         #reader {
-            width: 512px;
+            width: 100%;
+            max-width: 400px;
             margin: auto;
         }
     </style>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@10.5.3000/dist/dbr.bundle.js"></script>
 </head>
 <body>
 <h1>Scan QR Code</h1>
-<div id="scanner"></div>
+<div id="reader"></div>
 <p id="result"></p>
 
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        function onScanSuccess(decodedText, decodedResult) {
-            console.log(decodedText);
+      const barcodeScanner = new Dynamsoft.BarcodeScanner({
+        license: "DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA0MDI5NzQ5LVRYbFhaV0pRY205cSIsIm1haW5TZXJ2ZXJVUkwiOiJodHRwczovL21kbHMuZHluYW1zb2Z0b25saW5lLmNvbSIsIm9yZ2FuaXphdGlvbklEIjoiMTA0MDI5NzQ5Iiwic3RhbmRieVNlcnZlclVSTCI6Imh0dHBzOi8vc2Rscy5keW5hbXNvZnRvbmxpbmUuY29tIiwiY2hlY2tDb2RlIjo4NjQ1OTg0NzZ9",
+      });
+      (async () => {
+        const result = await barcodeScanner.launch();
+        alert(result.barcodeResults[0].text);
+      })();
 
-            const payload = {
-                url: decodedText
-            };
-
-            fetch("/url_to_user", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`http error ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log("response:", data);
-                    document.getElementById("result").innerText = `result: ${data.user_id}`;
-                })
-                .catch(error => {
-                    console.error("error:", error);
-                    document.getElementById("result").innerText = `error: ${error.message}`;
-                });
-        }
-
-        function onScanError(error) {
-            console.warn(`can't scan: ${error}`);
-        }
-
-        const html5QrCode = new Html5Qrcode("scanner");
-        html5QrCode.start(
-            {facingMode: "environment"},
-            {
-                fps: 10,
-                qrbox: {width: 64, height: 64}
-            },
-            onScanSuccess,
-            onScanError
-        ).catch(err => {
-            console.error(`can't scan: ${err}`);
-        });
-    });
+        //     scanner.onUnduplicatedRead = (txt, result) => {
+        //         console.log(txt);
+        //
+        //         const payload = {
+        //             url: txt
+        //         };
+        //
+        //         fetch("/url_to_user", {
+        //             method: "POST",
+        //             headers: {
+        //                 "Content-Type": "application/json"
+        //             },
+        //             body: JSON.stringify(payload)
+        //         })
+        //             .then(response => {
+        //                 if (!response.ok) {
+        //                     throw new Error(`http error ${response.status}`);
+        //                 }
+        //                 return response.json();
+        //             })
+        //             .then(data => {
+        //                 console.log("response:", data);
+        //                 document.getElementById("result").innerText = `result: ${data.user_id}`;
+        //             })
+        //             .catch(error => {
+        //                 console.error("error:", error);
+        //                 document.getElementById("result").innerText = `error: ${error.message}`;
+        //             });
+        //     };
+        //
+        //     // Configure the scanner
+        //     scanner.setUIElement(document.getElementById("reader"));
+        //     await scanner.open();
+        // } catch (ex) {
+        //     console.error("Failed to initialize the scanner:", ex);
+        // }
 </script>
 </body>
 </html>
