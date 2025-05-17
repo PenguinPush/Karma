@@ -76,6 +76,26 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/friends")
+def friends():
+    return render_template("friends.html")
+
+
+@app.route("/profile")
+def profile():
+    return render_template("profile.html")
+
+
+@app.route("/quests")
+def quests():
+    return render_template("quests.html")
+
+
+@app.route("/capture")
+def capture():
+    return render_template("capture.html")
+
+
 @app.route("/url_to_user", methods=["POST"])
 def url_to_user():
     # loads a user from a qr code, creates a new user if user doesn't exist in db
@@ -197,8 +217,25 @@ def upload_photo():
     return render_template("upload_photo.html")
 
 
+@app.route('/add_friend', methods=['GET', 'POST'])
+def add_friend():
+    if request.method == 'POST':
+        data = request.json
+        if not data or "user_id" not in data:
+            return jsonify({"error": "user_id is required"}), 400
+
+        user_id = data["user_id"]
+
+        response = make_response(redirect('/'))
+        response.set_cookie('user_session', user_id)
+
+        return response
+
+    return render_template('add_friend.html')
+
+
 @app.route('/get_user_json', methods=['POST'])
-def get_user_data():
+def get_user_json():
     try:
         data = request.json
         if not data or "user_id" not in data:
