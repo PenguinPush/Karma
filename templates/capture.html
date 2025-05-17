@@ -4,6 +4,7 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
     <title>Karma | Capture and Upload</title>
+<<<<<<< HEAD
     <link rel="stylesheet" href="../static/styles.css"/>
 </head>
 <body>
@@ -25,4 +26,29 @@
     </ul>
 </div>
 </body>
+=======
+    <link rel="stylesheet" href="../static/styles.css" />
+    </head>
+    <body>
+        <h1>Capture</h1>
+        <div class="camera-feed">
+            <video id="video" width="calc(100vw-20px)" height="calc(100vh-20px)" autoplay></video>
+            <button id="take-photo" style="margin-top: 20px;">Take Photo</button>
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+        <div class="upload-container">
+            <input type="file" id="image-upload" accept="image/*" style="opacity: 0;">
+            <label for="image-upload" class="upload-button">Upload Image</label>   
+        </div>
+        <div class="navbar">
+            <ul>
+                <li><a href="quests.html" class="button"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
+                <li><a href="leaderboard.html" class="button"><img src="../static/duooo.png" alt="leaderboard"></a></li>
+                <li><a href="capture.html" class="button largebutton"><img src="../static/BLACKADD.png" alt="capture"></a></li>
+                <li><a href="profile.html" class="button"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
+            </ul>
+        </div>
+        <script src="../static/camera.js"></script>
+    </body>
+>>>>>>> a8e377d (capture feed needs testing)
 </html>
