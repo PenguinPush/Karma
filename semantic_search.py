@@ -7,7 +7,7 @@ from pymongo.collection import Collection
 from bson.objectid import ObjectId  # If you store a unique _id for embeddings
 # SentenceTransformer is no longer needed
 # from sentence_transformers import SentenceTransformer
-import numpy as np  # OpenAI embeddings are lists of floats, numpy might not be directly needed here
+# import numpy as np  # OpenAI embeddings are lists of floats, numpy might not be directly needed here
 import datetime  # For timestamping new embeddings
 import certifi  # For SSL certificate verification with MongoDB Atlas
 
