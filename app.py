@@ -38,15 +38,23 @@ def url_to_user():
         fetched_user = User.get_user(users_collection, jamhacks_code)
 
         name, socials = get_jamhacks_data(jamhacks_code)
-        user = User(
-            jamhacks_code,
-            name,
-            socials,
-            fetched_user.karma,
-            fetched_user.friends,
-            fetched_user.quests,
-            fetched_user.id()
-        )
+        if fetched_user:
+            user = User(
+                jamhacks_code,
+                name,
+                socials,
+                fetched_user.karma,
+                fetched_user.friends,
+                fetched_user.quests,
+                fetched_user.photos,
+                fetched_user.id()
+            )
+        else:
+            user = User(
+                jamhacks_code,
+                name,
+                socials
+            )
 
         user.save_to_db(users_collection)
 
