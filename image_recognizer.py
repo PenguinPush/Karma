@@ -40,7 +40,7 @@ def get_image_labels_and_entities(gcs_image_uri: str) -> dict[str, float]:
 
 
     google_app_creds_json_string = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if not google_app_creds_json_string:
+    if google_app_creds_json_string is None:
         error_message = "Error: GOOGLE_APPLICATION_CREDENTIALS environment variable not set or is empty."
         print(error_message)
         return {"error": error_message}
