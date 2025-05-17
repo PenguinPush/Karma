@@ -21,13 +21,20 @@ users_collection = db["users"]
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        if username == 'admin' and password == 'password':
-            response = make_response(redirect('/'))
-            response.set_cookie('user_session', 'unique_session_token')
-            return response
-        return "Invalid credentials", 401
+        # Handle API request
+        data = request.json
+        if not data or "user_id" not in data:
+            return jsonify({"error": "user_id is required"}), 400
+
+        user_id = data["user_id"]
+
+        # Set the session cookie with the user ID
+        response = make_response(redirect('/'))
+        response.set_cookie('user_session', user_id)
+
+        return response
+
+    # Render the login page for GET requests or browser access
     return render_template('login.html')
 
 
@@ -47,7 +54,14 @@ def redirect_to_https():  # redirecting to https is needed for camera functional
 
 @app.before_request
 def check_user_session():
-    if request.endpoint in ["index"]:
+    if request.endpoint not in [
+        "login",
+        "static",
+        "redirect_to_https",
+        "url_to_user",
+        "scan_qr",
+        "get_dynamsoft_license"
+    ]:
         user_session = request.cookies.get('user_session')
         if not user_session:
             if request.endpoint:
