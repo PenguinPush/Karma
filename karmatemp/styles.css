@@ -1,0 +1,120 @@
+@font-face {
+	font-family: "name";
+	src: url("pathtottf")
+}
+
+html {
+	background: linear-gradient(#FFF09B, #C9FFDD);
+	height: 100%;
+}
+
+body {
+	font-family: "name";
+	color: black;
+	padding-bottom: 50px;
+	box-sizing: border-box;
+	display: flex;
+	justify-content: center;
+}
+
+h1 {
+	position: fixed;
+	top: 10px;
+	width: 100%;
+	font-size: 50px;
+	text-align: center;
+}
+
+h2 {
+	font-size: 40px;
+	text-align: center;
+	margin-top: 0px;
+	margin-bottom: 0px;
+	padding: 0px;
+}
+
+h3 {
+	margin-top: 5px;
+	text-align: center;
+	font-weight: normal;
+	font-size: 20px;
+}
+p {
+	text-align: left;
+	font-size: 20px;	
+}
+
+.largertext {
+	font-size: 22px;
+}
+
+.questbox {
+	display: inline-block;
+	justify-content: center;
+	position: fixed;
+	top: 120px;
+	width: 100%;
+	max-width: 80vw;
+	background-color: #F2FFD2;
+	border: none;
+	border-radius: 20px;
+	padding: 20px;
+}
+
+.uploadbutton {
+	
+}
+
+.navbar {
+	background-color: #C2FFF5;
+	position: fixed;
+	bottom: 50px;
+	width: 100%;
+	max-width: 80vw;
+	margin: 0 auto;
+	padding: 10px;
+}
+
+.navbar ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	display: flex;
+	justify-content: space-around;
+}
+
+.navbar li {
+	display: inline-block;
+}
+
+.button {
+	border: none;
+	border-radius: 50%;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	transition: all 0.2s ease-in-out;
+}
+
+.button img {
+	width: 24px;
+	height: 24px;
+	object-fit: contain;
+}
+
+.button:hover {
+	transform: scale(1.2);
+}
+
+.largebutton {
+	width: 36px;
+	height: 36px;
+}
+
+.largebutton img {
+	width: 30px;
+	height: 30px;
+}
