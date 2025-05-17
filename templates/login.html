@@ -14,7 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@10.5.3000/dist/dbr.bundle.js"></script>
 </head>
 <body>
-    <h1>SUCCESS!! you are getting redirected shortly</h1>
+    <h1 id="message">creating a new user, please wait a moment!!</h1>
     <div id="reader"></div>
 
     <script>
@@ -47,6 +47,11 @@
 
                         const urlToUserData = await urlToUserResponse.json();
                         const userId = urlToUserData.user_id;
+                        const newUser = urlToUserData.new_user;
+
+                        if (!newUser) {
+                            document.getElementById("message").innerHTML = "signed in! redirecting...";
+                        }
 
                         // Send the user ID to the /login endpoint to set the session cookie
                         const loginResponse = await fetch('/login', {
