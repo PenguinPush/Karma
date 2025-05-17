@@ -77,11 +77,28 @@ def scan_qr():
     return render_template("scan_qr.html")
 
 
-@app.route("upload_photo", methods=["POST"])
+@app.route("/upload_photo", methods=["POST"])
 def upload_photo():
     image_data = request.files['image'].read()
 
     return jsonify({"message": "Image received successfully"})
+
+
+@app.route('/get_dynamsoft_license', methods=["GET"])
+def get_license():
+    allowed_referers = [
+        "http://karmasarelaxingthought.tech",
+        "https://karmasarelaxingthought.tech",
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+    ]
+    referer = request.headers.get("Referer")
+    print("referer: " + referer)
+
+    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
+        return jsonify({"error": "Unauthorized access"}), 403
+
+    return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
 
 
 if __name__ == "__main__":

@@ -14,55 +14,40 @@
     <script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@10.5.3000/dist/dbr.bundle.js"></script>
 </head>
 <body>
-<h1>Scan QR Code</h1>
 <div id="reader"></div>
-<p id="result"></p>
 
 <script>
-      const barcodeScanner = new Dynamsoft.BarcodeScanner({
-        license: "DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA0MDI5NzQ5LVRYbFhaV0pRY205cSIsIm1haW5TZXJ2ZXJVUkwiOiJodHRwczovL21kbHMuZHluYW1zb2Z0b25saW5lLmNvbSIsIm9yZ2FuaXphdGlvbklEIjoiMTA0MDI5NzQ5Iiwic3RhbmRieVNlcnZlclVSTCI6Imh0dHBzOi8vc2Rscy5keW5hbXNvZnRvbmxpbmUuY29tIiwiY2hlY2tDb2RlIjo4NjQ1OTg0NzZ9",
-      });
-      (async () => {
-        const result = await barcodeScanner.launch();
-        alert(result.barcodeResults[0].text);
-      })();
+    fetch('/get_dynamsoft_license')
+        .then(response => response.json())
+        .then(data => {
+            const DYNAMSOFT_LICENSE = data.license;
 
-        //     scanner.onUnduplicatedRead = (txt, result) => {
-        //         console.log(txt);
-        //
-        //         const payload = {
-        //             url: txt
-        //         };
-        //
-        //         fetch("/url_to_user", {
-        //             method: "POST",
-        //             headers: {
-        //                 "Content-Type": "application/json"
-        //             },
-        //             body: JSON.stringify(payload)
-        //         })
-        //             .then(response => {
-        //                 if (!response.ok) {
-        //                     throw new Error(`http error ${response.status}`);
-        //                 }
-        //                 return response.json();
-        //             })
-        //             .then(data => {
-        //                 console.log("response:", data);
-        //                 document.getElementById("result").innerText = `result: ${data.user_id}`;
-        //             })
-        //             .catch(error => {
-        //                 console.error("error:", error);
-        //                 document.getElementById("result").innerText = `error: ${error.message}`;
-        //             });
-        //     };
-        //
-        //     // Configure the scanner
-        //     scanner.setUIElement(document.getElementById("reader"));
-        //     await scanner.open();
-        // } catch (ex) {
-        //     console.error("Failed to initialize the scanner:", ex);
-        // }
+            const barcodeScanner = new Dynamsoft.BarcodeScanner({
+                license: DYNAMSOFT_LICENSE,
+            });
+            (async () => {
+                const result = await barcodeScanner.launch();
+                alert(result.barcodeResults[0].text);
+
+                const payload = {
+                    url: result.barcodeResults[0].text
+                };
+
+                fetch("/url_to_user", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`http error ${response.status}`);
+                        }
+                        return response.json();
+                    })
+            })();
+        });
 </script>
 </body>
 </html>
