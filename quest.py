@@ -1,7 +1,7 @@
 from bson.objectid import ObjectId
 
 # EDWARD WANG PLEASE REPURPOUSE THIS FOR QUESTS
-class User:
+class Quest:
     def __init__(self, jamhacks_code, name, socials, karma=0, phone=None, friends=None, quests=None, photos=None, _id=None):
         self.jamhacks_code = jamhacks_code
         self.name = name
