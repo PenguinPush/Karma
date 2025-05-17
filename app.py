@@ -7,18 +7,15 @@ from pymongo import MongoClient
 import re
 from bson.objectid import ObjectId
 
-from user import User # Assuming user.py is in the same directory
-from web_scraper import get_jamhacks_data # Assuming web_scraper.py is in the same directory
+from user import User  # Assuming user.py is in the same directory
+from web_scraper import get_jamhacks_data  # Assuming web_scraper.py is in the same directory
 
 from image_recognizer import get_image_labels_and_entities
-from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS # Keep allowed_file defined locally or import it too
+from gcs_uploader import upload_image_stream_to_gcs_for_user, \
+    ALLOWED_IMAGE_EXTENSIONS  # Keep allowed_file defined locally or import it too
 from classifier import get_description, classify
 from semantic_search import process_activity_and_get_points
 
-def allowed_file(filename):
-    """Checks if the file's extension is allowed."""
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
 load_dotenv()
 
 app = Flask(__name__)
@@ -30,6 +27,12 @@ users_collection = db["users"]
 
 def get_user_session():
     return request.cookies.get('user_session')
+
+
+def allowed_file(filename):
+    """Checks if the file's extension is allowed."""
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
 
 
 @app.route('/login', methods=['GET', 'POST'])
