@@ -1,4 +1,3 @@
-# app.py (Formerly flask_gcs_image_webhook.py)
 import os
 import uuid
 from flask import Flask, request, jsonify, redirect, make_response, render_template
@@ -8,94 +7,29 @@ from pymongo import MongoClient
 import re
 from bson.objectid import ObjectId
 
-# --- User and Web Scraper Imports (from user's provided app.py) ---
-from user import User  # Assuming user.py is in the same directory
-from web_scraper import get_jamhacks_data  # Assuming web_scraper.py is in the same directory
+from user import User # Assuming user.py is in the same directory
+from web_scraper import get_jamhacks_data # Assuming web_scraper.py is in the same directory
 
-# --- GCS Uploader Import ---
-try:
-    from gcs_uploader import upload_image_stream_to_gcs_for_user, \
-        ALLOWED_IMAGE_EXTENSIONS  # Keep allowed_file defined locally or import it too
+from image_recognizer import get_image_labels_and_entities
+from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS # Keep allowed_file defined locally or import it too
+from classifier import get_description, classify
+from semantic_search import process_activity_and_get_points
 
-
-    # Define allowed_file locally if not imported from gcs_uploader
-    def allowed_file(filename):
-        """Checks if the file's extension is allowed."""
-        return '.' in filename and \
-               filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
-except ImportError:
-    print("CRITICAL ERROR: Could not import from 'gcs_uploader.py'.")
-
-
-    def upload_image_stream_to_gcs_for_user(file_stream, original_filename: str, user_id_folder: str,
-                                            bucket_name: str = "karma-videos",
-                                            content_type: str | None = None) -> str | None:
-        raise RuntimeError("GCS uploader function not found.")
-
-
-    ALLOWED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg'}
-
-
-    def allowed_file(filename):
-        return False  # Fallback
-
-# --- Image Recognizer, Classifier, and Semantic Search Imports ---
-try:
-    from Image_recognizer import get_image_labels_and_entities
-except ImportError:
-    print("CRITICAL ERROR: Could not import 'get_image_labels_and_entities' from 'Image_recognizer.py'.")
-
-
-    def get_image_labels_and_entities(gcs_image_uri: str) -> dict[str, float]:
-        raise RuntimeError("Image recognizer function not found.")
-
-try:
-    from classifier import get_description, classify
-except ImportError:
-    print("CRITICAL ERROR: Could not import 'get_description' or 'classify' from 'classifier.py'.")
-
-
-    def get_description(detected_labels: list[str], model_name: str = "gpt-4o") -> str | None:
-        raise RuntimeError("Classifier get_description function not found.")
-
-
-    def classify(activity_description: str, detected_labels: list[str], model_name: str = "gpt-4o") -> str | None:
-        raise RuntimeError("Classifier classify function not found.")
-
-try:
-    from semantic_search import process_activity_and_get_points
-except ImportError:
-    print("CRITICAL ERROR: Could not import 'process_activity_and_get_points' from 'semantic_search.py'.")
-
-
-    def process_activity_and_get_points(activity_category: str, activity_description: str,
-                                        detected_labels: list[str] | None = None) -> int:
-        raise RuntimeError("Semantic search/scoring function not found.")
-
+def allowed_file(filename):
+    """Checks if the file's extension is allowed."""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
 load_dotenv()
 
 app = Flask(__name__)
 
-# MongoDB Connection (from user's provided app.py)
-MONGO_URI_APP = os.getenv("MONGO_CONNECTION_STRING")
-if not MONGO_URI_APP:
-    raise ValueError("MONGO_CONNECTION_STRING not found in environment for Flask app.")
-client = MongoClient(MONGO_URI_APP)  # Assuming certifi is handled by MONGO_URI if it's Atlas
-db = client["karma"]  # Using "karma" as per user's app.py
+client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
+db = client["karma"]
 users_collection = db["users"]
-# Note: semantic_search.py also connects to MongoDB. Ensure configurations are consistent if they share DB/collections.
 
 
-# UPLOAD_FOLDER is for temporary local storage before GCS upload if not streaming directly.
-# If upload_image_stream_to_gcs_for_user streams directly, this might only be used by Werkzeug for large files.
-UPLOAD_FOLDER = 'temp_flask_uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-if not os.path.exists(UPLOAD_FOLDER):
-    try:
-        os.makedirs(UPLOAD_FOLDER)
-    except OSError as e:
-        print(f"Error creating temporary upload folder {UPLOAD_FOLDER}: {e}")
+def get_user_session():
+    return request.cookies.get('user_session')
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -104,11 +38,14 @@ def login():
         data = request.json
         if not data or "user_id" not in data:
             return jsonify({"error": "user_id is required"}), 400
+
         user_id = data["user_id"]
-        response = make_response(
-            jsonify({"message": "Login successful, redirecting...", "user_id": user_id}))  # Return JSON
-        response.set_cookie('user_session', user_id, httponly=True, samesite='Lax')  # Add security flags
+
+        response = make_response(redirect('/'))
+        response.set_cookie('user_session', user_id)
+
         return response
+
     return render_template('login.html')
 
 
@@ -120,7 +57,7 @@ def logout():
 
 
 @app.before_request
-def redirect_to_https():
+def redirect_to_https():  # redirecting to https is needed for camera functionality
     if 'DYNO' in os.environ and request.headers.get('X-Forwarded-Proto', 'http') != 'https':
         url = request.url.replace('http://', 'https://', 1)
         return redirect(url, code=301)
@@ -128,24 +65,29 @@ def redirect_to_https():
 
 @app.before_request
 def check_user_session():
-    # Added 'upload_endpoint' to public endpoints as it's an API
-    public_endpoints = ["login", "static", "redirect_to_https", "url_to_user", "scan_qr", "get_dynamsoft_license",
-                        "upload_endpoint", "home"]
-    if request.endpoint not in public_endpoints:
-        user_session = request.cookies.get('user_session')
+    if request.endpoint not in [
+        "login",
+        "static",
+        "redirect_to_https",
+        "url_to_user",
+        "scan_qr",
+        "get_dynamsoft_license"
+    ]:
+        user_session = get_user_session()
         if not user_session:
             if request.endpoint:
-                print(f"Redirecting, user not logged in for endpoint: {request.endpoint}")
+                print("redirecting, user not logged in!!" + request.endpoint)
             return redirect('/login')
 
 
 @app.route("/")
-def home():  # Renamed from index to home to match public_endpoints
+def index():
     return render_template("index.html")
 
 
 @app.route("/url_to_user", methods=["POST"])
 def url_to_user():
+    # loads a user from a qr code, creates a new user if user doesn't exist in db
     try:
         data = request.json
         if not data or "url" not in data:
@@ -156,26 +98,31 @@ def url_to_user():
         if not match:
             return jsonify({"error": "invalid url format"}), 400
 
+        print(match.group(1))
         jamhacks_code = match.group(1)
         user = User.get_user(users_collection, jamhacks_code)
+        print(user)
 
-        if user:
+        if user:  # skip creating a new user
             return jsonify({
-                "user_id": str(user.id()),  # Assuming user.id() returns ObjectId
+                "user_id": str(user.id()),
                 "new_user": False
             })
         else:
             name, socials = get_jamhacks_data(jamhacks_code)
-            user = User(jamhacks_code, name, socials)
-            user.save_to_db(users_collection)  # This will assign user._id
+            user = User(
+                jamhacks_code,
+                name,
+                socials
+            )
+
+            user.save_to_db(users_collection)
             return jsonify({
                 "user_id": str(user.id()),
                 "new_user": True
             })
+
     except Exception as e:
-        print(f"Error in /url_to_user: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -186,24 +133,16 @@ def scan_qr():
 
 @app.route('/get_dynamsoft_license', methods=["GET"])
 def get_dynamsoft_license():
-    # Consider more robust referer validation if this is sensitive
     allowed_referers = [
-        "http://karmasarelaxingthought.tech", "https://karmasarelaxingthought.tech",
-        "http://127.0.0.1", "https://127.0.0.1",
-        "http://localhost", "https://localhost"  # Added localhost for local dev
+        "http://karmasarelaxingthought.tech",
+        "https://karmasarelaxingthought.tech",
+        "http://127.0.0.1",
+        "https://127.0.0.1",
     ]
     referer = request.headers.get("Referer")
+    print("referer: " + referer)
 
-    # A simple check; for production, ensure this logic is secure enough
-    is_allowed = False
-    if referer:
-        for allowed_prefix in allowed_referers:
-            if referer.startswith(allowed_prefix):
-                is_allowed = True
-                break
-
-    if not is_allowed and not app.debug:  # Allow if debug mode for easier local testing
-        print(f"Unauthorized referer for Dynamsoft license: {referer}")
+    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
         return jsonify({"error": "Unauthorized access"}), 403
 
     return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
@@ -215,9 +154,9 @@ def upload_endpoint():
         return jsonify({"error": "No image file part in the request."}), 400
 
     file = request.files['image_file']
-    user_id_str = request.form.get('user_id')  # This is the uploader's user_id string
+    user_id = request.form.get('user_id')  # This is the uploader's user_id
 
-    if not user_id_str:
+    if not user_id:
         return jsonify({"error": "User ID (uploader_user_id) is required."}), 400
 
     if file.filename == '':
@@ -227,13 +166,16 @@ def upload_endpoint():
         original_filename = secure_filename(file.filename)
         gcs_uri = None
 
+        # Temporary local save is still used by gcs_uploader if not streaming directly
+        # If gcs_uploader is modified to stream, this local save can be removed.
+        # Based on the current gcs_uploader.py, it expects a stream.
+
         try:
-            print(
-                f"Calling GCS stream uploader for user_id_folder: {user_id_str}, original filename: {original_filename}")
+            print(f"Calling GCS stream uploader for user_id_folder: {user_id}, original filename: {original_filename}")
             gcs_uri = upload_image_stream_to_gcs_for_user(
-                file_stream=file,
+                file_stream=file,  # Pass the stream directly
                 original_filename=original_filename,
-                user_id_folder=user_id_str,
+                user_id_folder=user_id,  # Image will be stored in a folder named after the uploader's ID
                 content_type=file.content_type
             )
 
@@ -248,6 +190,7 @@ def upload_endpoint():
             image_labels_dict = get_image_labels_and_entities(gcs_uri)
 
             if not image_labels_dict or "error" in image_labels_dict:
+                # If Image_recognizer.py returns an error dict, propagate it
                 error_msg = image_labels_dict.get("error", "Failed to get image labels.") if isinstance(
                     image_labels_dict, dict) else "Failed to get image labels."
                 print(f"Error from Image Recognizer: {error_msg}")
@@ -260,6 +203,7 @@ def upload_endpoint():
             print("\nStep 2 (Flask): Getting activity description from classifier...")
             img_activity_description = get_description(formatted_labels)
             if not img_activity_description:
+                # Handle case where description might be None, provide a default or error
                 print("Warning: get_description returned None. Using a default description.")
                 img_activity_description = "Activity could not be automatically described from labels."
             print(f"Generated Activity Description: {img_activity_description}")
@@ -272,51 +216,38 @@ def upload_endpoint():
             print(f"Classified Category: {good_samaritan_category}")
 
             print("\nStep 4 (Flask): Processing activity for karma points from semantic_search...")
-            karma_points_info = process_activity_and_get_points(
+            karma_points_info = process_activity_and_get_points(  # This is from semantic_search.py
                 activity_category=good_samaritan_category,
                 activity_description=img_activity_description,
                 detected_labels=formatted_labels
             )
+            # process_activity_and_get_points is expected to return an int or raise an error
+            # The original scorer.py's get_score returned a dict, but semantic_search adapted it.
 
             print(f"Karma Points Calculated: {karma_points_info}")
 
-            # --- Directly update user data in MongoDB ---
-            current_user_karma = "User not found or karma not updated"
-            try:
-                user_object_id = ObjectId(user_id_str)  # Convert user_id string to ObjectId
-                update_result = users_collection.update_one(
-                    {"_id": user_object_id},
-                    {
-                        "$inc": {"karma": karma_points_info},
-                        "$push": {"photos": gcs_uri}
-                    }
-                )
-                if update_result.matched_count > 0:
-                    print(f"User {user_id_str}'s karma and photos updated in MongoDB.")
-                    # Fetch the updated karma to return (optional, adds a read)
-                    updated_user_doc = users_collection.find_one({"_id": user_object_id}, {"karma": 1})
-                    if updated_user_doc:
-                        current_user_karma = updated_user_doc.get("karma", "Could not fetch updated karma")
-                else:
-                    print(
-                        f"Warning: User with ID {user_id_str} (ObjectId: {user_object_id}) not found in DB for update.")
-                    current_user_karma = "User not found for update"
-            except Exception as e_db_update:
-                print(f"Error updating user {user_id_str} in MongoDB: {e_db_update}")
-                current_user_karma = "Error during karma update"
-            # --- End of direct MongoDB update ---
+            # Update user's karma points in DB
+            # This assumes you have a User class method to update karma
+            user_obj = User.get_user_by_id(users_collection, user_id)  # Assuming you have get_user_by_id
+            if user_obj:
+                user_obj.karma += karma_points_info  # Add new points
+                user_obj.photos.append(gcs_uri)  # Add photo to user's list
+                user_obj.save_to_db(users_collection)
+                print(f"User {user_id}'s karma updated to {user_obj.karma}. Photo {gcs_uri} added.")
+            else:
+                print(f"Warning: User with ID {user_id} not found to update karma.")
 
             return jsonify({
-                "message": f"Image '{original_filename}' processed successfully for user '{user_id_str}'.",
+                "message": f"Image '{original_filename}' processed successfully for user '{user_id}'.",
                 "gcs_uri": gcs_uri,
                 "image_labels": formatted_labels,
                 "activity_description": img_activity_description,
                 "classified_category": good_samaritan_category,
                 "karma_points_awarded": karma_points_info,
-                "user_current_karma": current_user_karma
+                "user_current_karma": user_obj.karma if user_obj else "User not found"
             }), 200
 
-        except RuntimeError as e:
+        except RuntimeError as e:  # Catch specific RuntimeError from placeholder functions
             print(f"A critical imported function is missing: {e}")
             return jsonify({"error": f"Server configuration error: {e}"}), 500
         except Exception as e:
@@ -324,6 +255,7 @@ def upload_endpoint():
             import traceback
             traceback.print_exc()
             return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
+        # No 'finally' block needed to remove a local temp file if streaming directly
     else:
         allowed_ext_str = ", ".join(sorted([ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS]))
         return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
@@ -342,35 +274,28 @@ def get_user_data():
             return jsonify({"error": "user_id is required"}), 400
 
         try:
-            user_id_str = data["user_id"]
-            user = users_collection.find_one({"_id": ObjectId(user_id_str)})
-            if not user:
-                # If user_id is potentially a jamhacks_code, your User class handles this.
-                # For direct DB query, if _id fails, you might have a fallback or specific error.
-                # This example assumes user_id is always the MongoDB _id string for this endpoint.
-                return jsonify({"error": "User not found by ObjectId"}), 404
+            user_id = ObjectId(data["user_id"])  # Convert to ObjectId
+        except Exception:
+            return jsonify({"error": "Invalid user_id format"}), 400
 
-        except Exception as e_oid:
-            print(f"Error finding user with ID '{data['user_id']}': {e_oid}")
-            return jsonify({"error": "Invalid user_id format or user not found"}), 400
+        user = users_collection.find_one({"_id": user_id})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
 
-        user_data_response = {
-            "_id": str(user.get("_id")),
+        print(user)
+
+        return jsonify({
             "jamhacks_code": user.get("jamhacks_code"),
             "name": user.get("name"),
             "socials": user.get("socials", []),
             "karma": user.get("karma"),
             "phone": user.get("phone"),
-            "friends": [str(friend_id) for friend_id in user.get("friends", [])],
+            "friends": user.get("friends", []),
             "quests": user.get("quests", []),
             "photos": user.get("photos", []),
-        }
-        return jsonify(user_data_response)
+        })
 
     except Exception as e:
-        print(f"Error in /get_user_json: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
