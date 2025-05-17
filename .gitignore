@@ -10,6 +10,9 @@ zinc-quest-455913-h8-82008c3806e7.json
 # C extensions
 *.so
 
+# edward
+.vscode/
+
 # Distribution / packaging
 .Python
 env/
