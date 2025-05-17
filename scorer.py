@@ -10,17 +10,17 @@ load_dotenv()
 
 # Attempt to import necessary functions from other files
 try:
-    # This function is expected to be in Image_recognizer.py and
+    # This function is expected to be in image_recognizer.py and
     # return a dict: {'label_description_lower': score}
-    from Image_recognizer import get_image_labels_and_entities
+    from image_recognizer import get_image_labels_and_entities
 except ImportError:
-    print("Error: Could not import 'get_image_labels_and_entities' from 'Image_recognizer.py'.")
-    print("Please ensure 'Image_recognizer.py' exists and contains this function for the example usage.")
+    print("Error: Could not import 'get_image_labels_and_entities' from 'image_recognizer.py'.")
+    print("Please ensure 'image_recognizer.py' exists and contains this function for the example usage.")
 
 
     def get_image_labels_and_entities(gcs_image_uri: str) -> dict[str, float]:  # Placeholder
         print("Placeholder: Real 'get_image_labels_and_entities' not found.")
-        return {"error": "Image_recognizer.py or its function not found."}
+        return {"error": "image_recognizer.py or its function not found."}
 
 try:
     # This function is expected to be in classifier.py
@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     print(f"--- Attempting to score activity based on image: {gcs_image_uri_for_scoring} ---")
 
-    print(f"\nStep 1: Getting labels from Image_recognizer.py for: {gcs_image_uri_for_scoring}")
+    print(f"\nStep 1: Getting labels from image_recognizer.py for: {gcs_image_uri_for_scoring}")
     detected_entities_dict = get_image_labels_and_entities(gcs_image_uri_for_scoring)
 
     if not detected_entities_dict or "error" in detected_entities_dict:
@@ -269,5 +269,5 @@ if __name__ == "__main__":
         "\n\nNote: This script uses OpenAI to assign a societal benefit score based on an activity description and pre-classification.")
     print("      Ensure all necessary API keys and credentials are set in your .env file.")
     print(
-        "      Also, ensure 'Image_recognizer.py' and 'classifier.py' (containing 'get_description' and 'classify_good_samaritan_activity_from_description_and_labels') are in the same directory or accessible in PYTHONPATH.")
+        "      Also, ensure 'image_recognizer.py' and 'classifier.py' (containing 'get_description' and 'classify_good_samaritan_activity_from_description_and_labels') are in the same directory or accessible in PYTHONPATH.")
 
