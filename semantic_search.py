@@ -126,7 +126,7 @@ def process_activity_and_get_points(
     STORES the new embedding and points in the database.
     Will raise exceptions on errors.
     """
-    if not embeddings_collection: # This check is more for logical completeness
+    if embeddings_collection is None: # This check is more for logical completeness
         raise ConnectionError("Critical: MongoDB embeddings collection not initialized (should have failed earlier if MONGO_URI was an issue).")
 
     text_for_embedding = f"Category: {activity_category}. Description: {activity_description}"
