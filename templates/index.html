@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Karma | Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="../static/styles.css">
 </head>
 <body>
     <h1>Quests</h1>
@@ -18,13 +18,16 @@
         <p class="largertext">Theme (2x points)</p>
         <p>Garbage</p>
     </div>
+    <div class="capturebutton">
+        <h2><a href="capture.html">Capture</a></h2>
+    </div>
     <div class="navbar">
         <ul>
-<li><a href="#" class="button"><img src="{{ url_for('static', filename='QUESTSBLACK.png') }}" alt="quests"></a></li>
-<li><a href="#" class="button"><img src="{{ url_for('static', filename='LEADERBLACK.png') }}" alt="leaderboard"></a></li>
-<li><a href="#" class="button largebutton"><img src="{{ url_for('static', filename='BLACKADD.png') }}" alt="capture"></a></li>
-<li><a href="#" class="button"><img src="{{ url_for('static', filename='VIDEOBLACK.png') }}" alt="videos"></a></li>
-<li><a href="#" class="button"><img src="{{ url_for('static', filename='PROFILEBLACK.png') }}" alt="profile"></a></li>
+            <li><a href="index.html" class="button"><img src="QUESTSBLACK.png" alt="quests"></a></li>
+            <li><a href="leaderboard.html" class="button"><img src="LEADERBLACK.png" alt="leaderboard"></a></li>
+            <li><a href="capture.html" class="button largebutton"><img src="BLACKADD.png" alt="capture"></a></li>
+            <li><a href="videos.html" class="button"><img src="VIDEOBLACK.png" alt="videos"></a></li>
+            <li><a href="profile.html" class="button"><img src="PROFILEBLACK.png" alt="profile"></a></li>
         </ul>
     </div>
 </body>
