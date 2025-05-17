@@ -45,4 +45,4 @@ def get_jamhacks_data(jamhacks_code):
         return name, socials
 
 
-get_jamhacks_data(536930711647551488)
+# get_jamhacks_data(536930711647551488)
