@@ -8,6 +8,7 @@ from user import User
 from web_scraper import get_jamhacks_data
 from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS, allowed_file
 from werkzeug.utils import secure_filename
+from bson.objectid import ObjectId
 
 load_dotenv()
 
@@ -21,13 +22,20 @@ users_collection = db["users"]
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        if username == 'admin' and password == 'password':
-            response = make_response(redirect('/'))
-            response.set_cookie('user_session', 'unique_session_token')
-            return response
-        return "Invalid credentials", 401
+        # Handle API request
+        data = request.json
+        if not data or "user_id" not in data:
+            return jsonify({"error": "user_id is required"}), 400
+
+        user_id = data["user_id"]
+
+        # Set the session cookie with the user ID
+        response = make_response(redirect('/'))
+        response.set_cookie('user_session', user_id)
+
+        return response
+
+    # Render the login page for GET requests or browser access
     return render_template('login.html')
 
 
@@ -47,7 +55,14 @@ def redirect_to_https():  # redirecting to https is needed for camera functional
 
 @app.before_request
 def check_user_session():
-    if request.endpoint in ["index"]:
+    if request.endpoint not in [
+        "login",
+        "static",
+        "redirect_to_https",
+        "url_to_user",
+        "scan_qr",
+        "get_dynamsoft_license"
+    ]:
         user_session = request.cookies.get('user_session')
         if not user_session:
             if request.endpoint:
@@ -75,34 +90,27 @@ def url_to_user():
 
         print(match.group(1))
         jamhacks_code = match.group(1)
-        fetched_user = User.get_user(users_collection, jamhacks_code)
-        print(fetched_user)
+        user = User.get_user(users_collection, jamhacks_code)
+        print(user)
 
-        name, socials = get_jamhacks_data(jamhacks_code)
-        if fetched_user:
-            user = User(
-                jamhacks_code,
-                name,
-                socials,
-                fetched_user.karma,
-                fetched_user.phone,
-                fetched_user.friends,
-                fetched_user.quests,
-                fetched_user.photos,
-                fetched_user.id()
-            )
+        if user:  # skip creating a new user
+            return jsonify({
+                "user_id": str(user.id()),
+                "new_user": False
+            })
         else:
+            name, socials = get_jamhacks_data(jamhacks_code)
             user = User(
                 jamhacks_code,
                 name,
                 socials
             )
 
-        user.save_to_db(users_collection)
-
-        return jsonify({
-            "user_id": str(user.id())
-        })
+            user.save_to_db(users_collection)
+            return jsonify({
+                "user_id": str(user.id()),
+                "new_user": True
+            })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -111,6 +119,23 @@ def url_to_user():
 @app.route("/scan_qr")
 def scan_qr():
     return render_template("scan_qr.html")
+
+
+@app.route('/get_dynamsoft_license', methods=["GET"])
+def get_dynamsoft_license():
+    allowed_referers = [
+        "http://karmasarelaxingthought.tech",
+        "https://karmasarelaxingthought.tech",
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+    ]
+    referer = request.headers.get("Referer")
+    print("referer: " + referer)
+
+    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
+        return jsonify({"error": "Unauthorized access"}), 403
+
+    return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
 
 
 @app.route('/upload_endpoint', methods=['POST'])
@@ -171,21 +196,37 @@ def upload_photo():
     return render_template("upload_photo.html")
 
 
-@app.route('/get_dynamsoft_license', methods=["GET"])
-def get_dynamsoft_license():
-    allowed_referers = [
-        "http://karmasarelaxingthought.tech",
-        "https://karmasarelaxingthought.tech",
-        "http://127.0.0.1",
-        "https://127.0.0.1",
-    ]
-    referer = request.headers.get("Referer")
-    print("referer: " + referer)
+@app.route('/get_user_json', methods=['POST'])
+def get_user_data():
+    try:
+        data = request.json
+        if not data or "user_id" not in data:
+            return jsonify({"error": "user_id is required"}), 400
 
-    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
-        return jsonify({"error": "Unauthorized access"}), 403
+        try:
+            user_id = ObjectId(data["user_id"])  # Convert to ObjectId
+        except Exception:
+            return jsonify({"error": "Invalid user_id format"}), 400
 
-    return jsonify({"license": os.getenv("DYNAMSOFT_LICENSE")})
+        user = users_collection.find_one({"_id": user_id})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        print(user)
+
+        return jsonify({
+            "jamhacks_code": user.get("jamhacks_code"),
+            "name": user.get("name"),
+            "socials": user.get("socials", []),
+            "karma": user.get("karma"),
+            "phone": user.get("phone"),
+            "friends": user.get("friends", []),
+            "quests": user.get("quests", []),
+            "photos": user.get("photos", []),
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
