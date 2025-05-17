@@ -1,12 +1,12 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, redirect
+from flask import Flask, render_template, request, jsonify, redirect, make_response
 from pymongo import MongoClient
 import re
 from user import User
 from web_scraper import get_jamhacks_data
-from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS
+from gcs_uploader import upload_image_stream_to_gcs_for_user, ALLOWED_IMAGE_EXTENSIONS, allowed_file
 from werkzeug.utils import secure_filename
 
 
@@ -18,10 +18,25 @@ client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
 db = client["karma"]
 users_collection = db["users"]
 
-def allowed_file(filename):
-    """Checks if the file's extension is allowed."""
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
+
+@app.route('/login_endpoint', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == 'admin' and password == 'password':
+            response = make_response(redirect('/'))
+            response.set_cookie('user_session', 'unique_session_token')
+            return response
+        return "Invalid credentials", 401
+    return render_template('login.html')
+
+
+@app.route('/logout_endpoint')
+def logout():
+    response = make_response(redirect('/login'))
+    response.delete_cookie('user_session')
+    return response
 
 
 @app.before_request
@@ -29,6 +44,15 @@ def redirect_to_https():  # redirecting to https is needed for camera functional
     if 'DYNO' in os.environ and request.headers.get('X-Forwarded-Proto', 'http') != 'https':
         url = request.url.replace('http://', 'https://', 1)
         return redirect(url, code=301)
+
+
+@app.before_request
+def check_user_session():
+    if request.endpoint not in ['login', 'static']:
+        user_session = request.cookies.get('user_session')
+        if not user_session:
+            return redirect('/login')
+
 
 @app.route("/")
 def index():
@@ -59,6 +83,7 @@ def url_to_user():
                 name,
                 socials,
                 fetched_user.karma,
+                fetched_user.phone,
                 fetched_user.friends,
                 fetched_user.quests,
                 fetched_user.photos,
