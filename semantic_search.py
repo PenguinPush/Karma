@@ -191,7 +191,7 @@ if __name__ == "__main__":
         img_activity_description,
         formatted_labels
     )
-    if not good_samaritan_category:
+    if good_samaritan_category is None:
         raise ValueError("good_samaritan_category from classifier.classify cannot be None for further processing.")
     print(f"Classified Category: {good_samaritan_category}")
 
