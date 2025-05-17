@@ -177,9 +177,9 @@ def upload_endpoint():
         return jsonify({"error": "No image file part in the request."}), 400
 
     file = request.files['image_file']
-    user_id = request.form.get('user_id')  # This is the uploader's user_id
+    user_id_str = request.form.get('user_id')  # This is the uploader's user_id string
 
-    if not user_id:
+    if not user_id_str:
         return jsonify({"error": "User ID (uploader_user_id) is required."}), 400
 
     if file.filename == '':
@@ -189,16 +189,13 @@ def upload_endpoint():
         original_filename = secure_filename(file.filename)
         gcs_uri = None
 
-        # Temporary local save is still used by gcs_uploader if not streaming directly
-        # If gcs_uploader is modified to stream, this local save can be removed.
-        # Based on the current gcs_uploader.py, it expects a stream.
-
         try:
-            print(f"Calling GCS stream uploader for user_id_folder: {user_id}, original filename: {original_filename}")
+            print(
+                f"Calling GCS stream uploader for user_id_folder: {user_id_str}, original filename: {original_filename}")
             gcs_uri = upload_image_stream_to_gcs_for_user(
-                file_stream=file,  # Pass the stream directly
+                file_stream=file,
                 original_filename=original_filename,
-                user_id_folder=user_id,  # Image will be stored in a folder named after the uploader's ID
+                user_id_folder=user_id_str,
                 content_type=file.content_type
             )
 
@@ -213,7 +210,6 @@ def upload_endpoint():
             image_labels_dict = get_image_labels_and_entities(gcs_uri)
 
             if not image_labels_dict or "error" in image_labels_dict:
-                # If Image_recognizer.py returns an error dict, propagate it
                 error_msg = image_labels_dict.get("error", "Failed to get image labels.") if isinstance(
                     image_labels_dict, dict) else "Failed to get image labels."
                 print(f"Error from Image Recognizer: {error_msg}")
@@ -225,8 +221,7 @@ def upload_endpoint():
 
             print("\nStep 2 (Flask): Getting activity description from classifier...")
             img_activity_description = get_description(formatted_labels)
-            if img_activity_description is None:
-                # Handle case where description might be None, provide a default or error
+            if not img_activity_description:
                 print("Warning: get_description returned None. Using a default description.")
                 img_activity_description = "Activity could not be automatically described from labels."
             print(f"Generated Activity Description: {img_activity_description}")
@@ -239,38 +234,51 @@ def upload_endpoint():
             print(f"Classified Category: {good_samaritan_category}")
 
             print("\nStep 4 (Flask): Processing activity for karma points from semantic_search...")
-            karma_points_info = process_activity_and_get_points(  # This is from semantic_search.py
+            karma_points_info = process_activity_and_get_points(
                 activity_category=good_samaritan_category,
                 activity_description=img_activity_description,
                 detected_labels=formatted_labels
             )
-            # process_activity_and_get_points is expected to return an int or raise an error
-            # The original scorer.py's get_score returned a dict, but semantic_search adapted it.
 
             print(f"Karma Points Calculated: {karma_points_info}")
 
-            # Update user's karma points in DB
-            # This assumes you have a User class method to update karma
-            user_obj = User.get_user_by_id(users_collection, user_id)  # Assuming you have get_user_by_id
-            if user_obj:
-                user_obj.karma += karma_points_info  # Add new points
-                user_obj.photos.append(gcs_uri)  # Add photo to user's list
-                user_obj.save_to_db(users_collection)
-                print(f"User {user_id}'s karma updated to {user_obj.karma}. Photo {gcs_uri} added.")
-            else:
-                print(f"Warning: User with ID {user_id} not found to update karma.")
+            # --- Directly update user data in MongoDB ---
+            current_user_karma = "User not found or karma not updated"
+            try:
+                user_object_id = ObjectId(user_id_str)  # Convert user_id string to ObjectId
+                update_result = users_collection.update_one(
+                    {"_id": user_object_id},
+                    {
+                        "$inc": {"karma": karma_points_info},
+                        "$push": {"photos": gcs_uri}
+                    }
+                )
+                if update_result.matched_count > 0:
+                    print(f"User {user_id_str}'s karma and photos updated in MongoDB.")
+                    # Fetch the updated karma to return (optional, adds a read)
+                    updated_user_doc = users_collection.find_one({"_id": user_object_id}, {"karma": 1})
+                    if updated_user_doc:
+                        current_user_karma = updated_user_doc.get("karma", "Could not fetch updated karma")
+                else:
+                    print(
+                        f"Warning: User with ID {user_id_str} (ObjectId: {user_object_id}) not found in DB for update.")
+                    current_user_karma = "User not found for update"
+            except Exception as e_db_update:
+                print(f"Error updating user {user_id_str} in MongoDB: {e_db_update}")
+                current_user_karma = "Error during karma update"
+            # --- End of direct MongoDB update ---
 
             return jsonify({
-                "message": f"Image '{original_filename}' processed successfully for user '{user_id}'.",
+                "message": f"Image '{original_filename}' processed successfully for user '{user_id_str}'.",
                 "gcs_uri": gcs_uri,
                 "image_labels": formatted_labels,
                 "activity_description": img_activity_description,
                 "classified_category": good_samaritan_category,
                 "karma_points_awarded": karma_points_info,
-                "user_current_karma": user_obj.karma if user_obj else "User not found"
+                "user_current_karma": current_user_karma
             }), 200
 
-        except RuntimeError as e:  # Catch specific RuntimeError from placeholder functions
+        except RuntimeError as e:
             print(f"A critical imported function is missing: {e}")
             return jsonify({"error": f"Server configuration error: {e}"}), 500
         except Exception as e:
@@ -278,7 +286,6 @@ def upload_endpoint():
             import traceback
             traceback.print_exc()
             return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
-        # No 'finally' block needed to remove a local temp file if streaming directly
     else:
         allowed_ext_str = ", ".join(sorted([ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS]))
         return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
