@@ -559,18 +559,3 @@ def get_user_json():
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5002))
     app.run(host='0.0.0.0', port=port, debug=True)
-    target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
-    duration_seconds = 24 * 60 * 60  # Default 24 hours for an onboarding quest
-
-    # Quest.generate_new_system_quest_data returns a dict with creation_time and expiry_time
-    new_quest_data = Quest.generate_new_system_quest_data(
-        user_to_id=str(ObjectId(get_user_session())),  # Pass the string representation of ObjectId
-        target_category=target_category,
-        duration_seconds=duration_seconds
-    )
-
-    # Save the new quest (which includes creation_time and expiry_time) to the quests_collection
-    result = quests_collection.insert_one(new_quest_data)
-    new_quest_mongo_id = result.inserted_id
-    new_quest_id_str = new_quest_data["quest_id_str"]
-    print(str(result) + 'asodhsakjdb')
