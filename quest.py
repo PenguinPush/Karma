@@ -253,7 +253,7 @@ class Quest:
                                        completion_image_uri: str,
                                        user_friends_list: List[str],  # List of friend user_ids (strings)
                                        quests_collection: Collection,
-                                       # users_collection: Collection, # Not directly needed if User object updates itself
+                                       users_collection: Collection, # Not directly needed if User object updates itself
                                        all_possible_categories: List[str] = POSSIBLE_QUEST_CATEGORIES,
                                        nomination_duration_seconds: int = 24 * 60 * 60) -> Optional[Dict]:
         """
