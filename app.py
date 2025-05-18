@@ -1,4 +1,5 @@
 import os
+import certifi
 import uuid
 from flask import Flask, request, jsonify, redirect, make_response, render_template
 from werkzeug.utils import secure_filename
@@ -21,7 +22,7 @@ load_dotenv()
 app = Flask(__name__)
 scraper = Scraper()
 
-client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
+client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"), tls=True, tlsCAFile=certifi.where())
 db = client["karma"]
 users_collection = db["users"]
 
