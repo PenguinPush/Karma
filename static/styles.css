@@ -66,6 +66,23 @@ a {
 	font-size: 27px;
 }
 
+.onboard {
+	display: inline-block;
+	justify-content: center;
+	overflow-y: auto;
+	overflow-x: hidden;
+	position: fixed;
+	top: 35vh;
+	height: 55vh;
+	width: 100%;
+	max-width: 80vw;
+	background-color: #F2FFD2;
+	border: none;
+	border-radius: 20px;
+	padding: 20px;
+	box-sizing: border-box;
+}
+
 .questbox {
 	display: inline-block;
 	justify-content: center;
