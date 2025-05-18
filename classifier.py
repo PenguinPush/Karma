@@ -1,30 +1,22 @@
-# openai_classifier.py
 import os
 import openai
 from dotenv import load_dotenv
 import json  # For parsing JSON response
 
-# Attempt to import the image label extraction function from image_recognizer.py
 try:
     from image_recognizer import get_image_labels_and_entities
-    # This assumes image_recognizer.py is in the same directory or Python path
-    # and contains a function get_image_labels_and_entities(gcs_image_uri) -> dict[str, float]
+    
 except ImportError:
     print("Error: Could not import 'get_image_labels_and_entities' from 'image_recognizer.py'.")
     print("Please ensure 'image_recognizer.py' exists and contains this function.")
 
 
-    # Define a placeholder if the import fails, so the script can still be loaded (but not run successfully)
     def get_image_labels_and_entities(gcs_image_uri: str) -> dict[str, float]:
         print("Placeholder function: Real 'get_image_labels_and_entities' not found.")
         return {"error": "image_recognizer.py or its function not found."}
 
-# Load environment variables from .env file
-# Ensure your .env file has OPENAI_API_KEY defined (and GOOGLE_APPLICATION_CREDENTIALS if image_recognizer.py needs it)
 load_dotenv()
 
-# Initialize the OpenAI client
-# The client will automatically look for the OPENAI_API_KEY environment variable
 try:
     openai_client = openai.OpenAI()
 except openai.OpenAIError as e:
@@ -35,7 +27,6 @@ except Exception as e_general_openai:  # Catch any other potential errors during
     print(f"A general error occurred initializing OpenAI client: {e_general_openai}")
     openai_client = None
 
-# Define your "Good Samaritan" categories (as per user's last provided code)
 GOOD_SAMARITAN_CATEGORIES = [
     "Recycling Activity",
     "Litter Pickup",
@@ -49,7 +40,7 @@ GOOD_SAMARITAN_CATEGORIES = [
 ]
 
 
-# --- OpenAI Function to get activity description from labels ---
+
 def get_description(detected_labels: list[str], model_name: str = "gpt-4o") -> str | None:
     """
     Generates a short natural language description of the activity depicted
@@ -90,8 +81,8 @@ def get_description(detected_labels: list[str], model_name: str = "gpt-4o") -> s
                 {"role": "system", "content": prompt_system},
                 {"role": "user", "content": prompt_user}
             ],
-            temperature=0.5,  # Allow for some natural language generation
-            max_tokens=100  # Sufficient for a short description
+            temperature=0.5,  
+            max_tokens=100  
         )
         description = completion.choices[0].message.content.strip()
         print(f"OpenAI Generated Description: {description}")
@@ -106,7 +97,6 @@ def get_description(detected_labels: list[str], model_name: str = "gpt-4o") -> s
         return None
 
 
-# --- OpenAI Classifier Function (Using Tool Calling for structured output) ---
 def classify(
         activity_description: str,
         detected_labels: list[str],
@@ -247,9 +237,8 @@ def classify(
         return None
 
 
-# --- Main Execution Block (Modified for Integrated Testing) ---
 if __name__ == "__main__":
-    gcs_image_uri_to_test = "gs://karma-videos/recycle.png"  # Replace with your actual image URI
+    gcs_image_uri_to_test = "gs://karma-videos/recycle.png"  
 
     is_placeholder_uri = "your-gcs-bucket-name" in gcs_image_uri_to_test or \
                          "your-image.jpg" in gcs_image_uri_to_test or \

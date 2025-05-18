@@ -6,21 +6,21 @@
     <title>Karma | Friends</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        /* Adjust leaderboard width and spacing */
+        
         .leaderboard {
-            width: 90%; /* Slightly wider to reduce blank space */
-            max-width: 600px; /* Reduce max width for better fit */
-            margin: 10px 0; /* Reduce vertical margin */
+            width: 90%; 
+            max-width: 600px;
+            margin: 10px 0; 
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            padding: 5px 0; /* Reduce padding */
+            padding: 5px 0; 
         }
 
-        /* Adjust entry spacing and alignment */
+        
         .entry {
             display: flex;
             align-items: center;
-            padding: 10px 15px; /* Reduce padding */
+            padding: 10px 15px; 
             border-bottom: 1px solid #eee;
             transition: background-color 0.2s ease-in-out;
         }
@@ -30,86 +30,81 @@
         }
 
         .entry:hover {
-            background-color: #f5f5f5; /* Slightly lighter hover effect */
+            background-color: #f5f5f5; 
         }
 
-        /* Adjust placement size and alignment */
+        
         .placement {
-            font-size: 1.2em; /* Slightly smaller font */
+            font-size: 1.2em; 
             font-weight: bold;
             color: #007bff;
-            margin-right: 15px; /* Reduce margin */
-            width: 30px; /* Reduce width */
+            margin-right: 15px; 
+            width: 30px; 
             text-align: center;
         }
 
-        /* Adjust user and points text */
         .user {
-            font-size: 1em; /* Slightly smaller font */
+            font-size: 1em; 
             font-weight: 600;
             color: #333;
         }
 
         .points {
-            font-size: 0.9em; /* Slightly smaller font */
+            font-size: 0.9em; 
             color: #555;
         }
 
-        /* Adjust add friends button spacing */
         .addfriendsbutton {
-            position: relative; /* Make the button non-scrollable */
+            position: relative; 
             text-align: center;
-            margin: 0; /* Remove unnecessary margins */
-            white-space: nowrap; /* Prevent text wrapping */
-            overflow: hidden; /* Hide any overflow */
-            display: inline-block; /* Ensure proper layout */
-            width: 85%;
+            margin: 0; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            display: inline-block; 
         }
 
         .addfriendsbutton h3 a {
             text-decoration: none;
             color: #007bff;
-            font-size: 1.1em; /* Slightly smaller font */
-            padding: 8px 10px; /* Adjust padding */
+            font-size: 1.1em; 
+            padding: 8px 10px; 
             border-radius: 5px;
             transition: background-color 0.2s, color 0.2s;
-            white-space: nowrap; /* Prevent text wrapping */
-            overflow: hidden; /* Hide any overflow */
-            display: inline-block; /* Ensure proper layout */
+            white-space: nowrap;
+            overflow: hidden; 
+            display: inline-block; 
         }
 
         .addfriendsbutton img {
             vertical-align: middle;
-            margin-right: 5px; /* Reduce margin */
-            width: 20px; /* Reduce size */
+            margin-right: 5px;
+            width: 20px; 
             height: 20px;
-            white-space: nowrap; /* Prevent text wrapping */
-            overflow: hidden; /* Hide any overflow */
-            display: inline-block; /* Ensure proper layout */
-        }
+            white-space: nowrap; 
+            overflow: hidden; 
 
-        /* Adjust entry spacing and alignment */
+
         .entry {
             display: flex;
             align-items: center;
-            justify-content: space-between; /* Ensure proper spacing */
+            justify-content: space-between; 
             padding: 10px 10px;
             border-bottom: 1px solid #eee;
             transition: background-color 0.2s ease-in-out;
-            flex-wrap: nowrap; /* Prevent wrapping */
+            flex-wrap: nowrap; 
         }
 
         .info {
             display: flex;
             flex-direction: column;
-            flex-shrink: 1; /* Allow shrinking */
-            min-width: 0; /* Prevent overflow */
+            flex-shrink: 1; 
+            min-width: 0; 
         }
 
         .user, .points {
-            white-space: nowrap; /* Prevent text wrapping */
-            overflow: hidden; /* Hide overflow */
-            text-overflow: ellipsis; /* Add ellipsis for overflowed text */
+            white-space: nowrap; 
+            overflow: hidden;
+            text-overflow: ellipsis; 
         }
     </style>
 </head>

@@ -32,7 +32,6 @@
                     try {
                         const result = await barcodeScanner.launch();
                         const scannedUrl = result.barcodeResults[0].text;
-                        // Send the scanned URL to the /url_to_user endpoint
                         const urlToUserResponse = await fetch('/url_to_user', {
                             method: 'POST',
                             headers: {
@@ -51,7 +50,6 @@
                         if (!newUser) {
                             document.getElementById("message").innerHTML = "friend added!! redirecting...";
                         }
-                        // Send the user ID to the /login endpoint to set the session cookie
                         const loginResponse = await fetch('/add_friend', {
                             method: 'POST',
                             headers: {
@@ -62,7 +60,6 @@
                         if (!loginResponse.ok) {
                             throw new Error(`Error from /friends: ${loginResponse.status}`);
                         }
-                    // Redirect to the home page after successful login
                         window.location.href = '/onboarding_pg2';
                     } catch (error) {
                         console.error('friends failed:', error);

@@ -12,7 +12,7 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: #fff; /* Match your page background */
+            background: #fff;
             z-index: 9999;
             transform: translateX(100vw);
             transition: transform 0.5s cubic-bezier(.77, 0, .18, 1);
@@ -25,7 +25,7 @@
         }
 
         .questbox .button {
-            padding: 15px 0 !important; /* Makes the green button a bit higher */
+            padding: 15px 0 !important;
             font-size: 1.3rem;
             margin-top: 20px !important;
 
@@ -51,7 +51,7 @@
 
         .questbox-header {
             display: flex;
-            align-items: flex-start; /* Align image and text to the top */
+            align-items: flex-start; 
             justify-content: flex-start;
             margin-bottom: 8px;
         }
@@ -143,36 +143,32 @@
 <div id="slide-overlay"></div>
 
 <script>
-    // Navigation slide animation
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', function (e) {
-            // Allow default behavior if it's the current page or an external link
             if (window.location.pathname === new URL(this.href).pathname) return;
 
             e.preventDefault();
             const overlay = document.getElementById('slide-overlay');
             const targetUrl = this.getAttribute('href');
 
-            // Determine slide direction (simple example)
-            // You might want more sophisticated logic based on navbar order
+            
             const currentPath = window.location.pathname;
             if (targetUrl.includes('friends') && currentPath.includes('quests')) {
-                overlay.style.transformOrigin = 'left'; // Slide from left
+                overlay.style.transformOrigin = 'left'; 
             } else if (targetUrl.includes('quests') && currentPath.includes('friends')) {
-                overlay.style.transformOrigin = 'right'; // Slide from right
+                overlay.style.transformOrigin = 'right'; 
             } else {
-                overlay.style.transformOrigin = 'left'; // Default
+                overlay.style.transformOrigin = 'left'; 
             }
 
 
             overlay.classList.add('active');
             setTimeout(() => {
                 window.location = targetUrl;
-            }, 400); // Match CSS transition duration
+            }, 400); 
         });
     });
 
-    // Countdown timer for quests
     function updateCountdown() {
         const now = new Date();
         document.querySelectorAll('.time-remaining').forEach(timerElement => {
@@ -188,7 +184,6 @@
             if (timeLeft < 0) {
                 timerElement.textContent = "Expired!";
                 timerElement.style.color = "red";
-                // Optionally, disable the "Complete Quest" button or change its text
                 const questBox = timerElement.closest('.questbox');
                 if (questBox) {
                     const completeButton = questBox.querySelector('a.button');
@@ -208,7 +203,7 @@
 
             let timeString = "";
             if (days > 0) timeString += `${days}d `;
-            if (hours > 0 || days > 0) timeString += `${hours}h `; // Show hours if days are present or hours > 0
+            if (hours > 0 || days > 0) timeString += `${hours}h `; 
             if (minutes > 0 || hours > 0 || days > 0) timeString += `${minutes}m `;
             timeString += `${seconds}s`;
 
@@ -216,9 +211,7 @@
         });
     }
 
-    // Update countdown every second
     setInterval(updateCountdown, 1000);
-    // Initial call to display immediately
     updateCountdown();
 </script>
 </body>

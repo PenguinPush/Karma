@@ -2,22 +2,22 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 90vh; /* Ensure it takes the full viewport height */
+    min-height: 90vh; 
     margin: 0;
     padding: 0;
 }
 
 .heading-box {
     top: 0;
-    width: 85%; /* Adjust width as needed */
-    max-width: 600px; /* Limit the maximum width */
-    /* Center the box and add vertical spacing */
+    width: 85%; 
+    max-width: 600px; 
+  
     margin: 0 auto;
-    padding: 5px; /* Add padding inside the box */
-    background-color: #f9f9f9; /* Light background color */
-    border-radius: 10px; /* Rounded corners */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
-    text-align: center; /* Center the text */
+    padding: 5px; 
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); 
+    text-align: center;
 }
 
 @font-face {
@@ -36,7 +36,6 @@ body {
     padding: 0;
 }
 
-/* Base Styles */
 html, body {
     height: 100%;
     background-color: #e1dfff;
@@ -51,7 +50,6 @@ body {
     padding-bottom: 100px;
 }
 
-/* Headings */
 h1, h2, h3, h4, p {
     text-align: center;
     margin-bottom: 0.5rem;
@@ -82,7 +80,6 @@ p {
     text-align: left;
 }
 
-/* Links */
 a {
     color: black;
     text-decoration: none;
@@ -92,7 +89,6 @@ a {
     font-size: 1.7rem;
 }
 
-/* Containers */
 .onboard,
 .questbox,
 .camera-feed,
@@ -109,7 +105,6 @@ a {
     overflow-y: auto;
 }
 
-/* Questbox Custom */
 .questbox {
     max-height: 60vh;
 }
@@ -124,7 +119,6 @@ a {
     border-radius: 8px;
 }
 
-/* Camera */
 .camera-feed {
     align-items: center;
     text-align: center;
@@ -153,12 +147,10 @@ a {
     border: 2px solid black;
 }
 
-/* Upload */
 .upload-container {
     margin-top: 1rem;
 }
 
-/* Questbox Header */
 .questbox-header {
     display: flex;
     align-items: center;
@@ -181,7 +173,6 @@ a {
     margin: 0;
 }
 
-/* Leaderboard */
 .entry {
     display: flex;
     align-items: center;
@@ -204,7 +195,6 @@ a {
     font-size: 1rem;
 }
 
-/* Images */
 .allimages {
     display: flex;
     flex-wrap: wrap;
@@ -223,7 +213,6 @@ a {
     object-fit: contain;
 }
 
-/* Navbar */
 .navbar {
     background-color: #8c86b4;
     width: 100%;
@@ -243,7 +232,6 @@ a {
     display: inline-block;
 }
 
-/* Buttons */
 .button, .button1 {
     border: none;
     border-radius: 50%;

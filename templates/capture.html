@@ -39,7 +39,7 @@
         const takePhotoButton = document.getElementById('take-photo');
         const submitCapturedPhotoButton = document.getElementById('submit-captured-photo');
         const questId = "{{ quest_id_str }}";
-        const uploadEndpoint = "{{ url_for('upload_endpoint') }}"; // Ensure this matches your Flask route name
+        const uploadEndpoint = "{{ url_for('upload_endpoint') }}"; 
 
         let capturedImageBlob = null;
 
@@ -102,27 +102,21 @@
         async function sendFormData(formData) {
             if (submitCapturedPhotoButton) submitCapturedPhotoButton.disabled = true;
             if (fallbackInput) fallbackInput.disabled = true;
-            // Consider adding a visual "loading" indicator here if desired
-
+            
             try {
                 const response = await fetch(uploadEndpoint, {
                     method: 'POST',
                     body: formData,
-                    // redirect: 'follow' is the default behavior for fetch
+                    
                 });
 
-                // If the server responded with a redirect (e.g., to /results),
-                // fetch will have followed it. The 'response.url' will be the final URL.
-                // We need to explicitly navigate the browser to this final URL.
-                if (response.ok) { // Checks if the final status code is 200-299
+                
+                if (response.ok) { 
                     console.log("Request successful. Final URL:", response.url);
-                    // Force navigation to the final URL (which should be the /results page)
+                   
                     window.location.href = response.url;
                 } else {
-                    // This block is reached if the *final* response after any redirects was an error
-                    // (e.g., 404 or 500 on the /results page itself),
-                    // OR if the initial POST to /upload_endpoint returned an error *without* redirecting
-                    // (though your Flask app is set to redirect with session data for errors).
+                    
                     console.error("Request failed or final page load failed. Status:", response.status, response.statusText, "Final URL:", response.url);
                     const contentType = response.headers.get("content-type");
                     let errorMsg = `Upload failed. Status: ${response.status}.`;
@@ -135,18 +129,17 @@
                             errorMsg += " Could not parse server error message.";
                         }
                     } else {
-                        // If not JSON, it might be an HTML error page from Flask
+                       
                         const errorText = await response.text();
                         console.error("Server response (HTML or text):", errorText.substring(0, 500));
                         errorMsg += " The server might be down or an unexpected error occurred.";
                     }
                     alert(errorMsg);
-                    // Re-enable buttons on error if not redirecting
                     if (submitCapturedPhotoButton) submitCapturedPhotoButton.disabled = false;
                     if (fallbackInput) fallbackInput.disabled = false;
                 }
 
-            } catch (error) { // Network error or other JS error during fetch
+            } catch (error) { 
                 console.error('Error submitting form data:', error);
                 alert('An error occurred while trying to upload. Please check your network connection and try again.');
                 if (submitCapturedPhotoButton) submitCapturedPhotoButton.disabled = false;

@@ -10,15 +10,15 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 import re
 from bson.objectid import ObjectId
-import mimetypes # For guessing MIME type
+import mimetypes 
 
-from web_scraper import Scraper  # Assuming web_scraper.py is in the same directory
+from web_scraper import Scraper  
 from google.cloud import storage as gcs_storage
-from google.oauth2 import service_account as gcs_service_account # For credentials from JSON string
+from google.oauth2 import service_account as gcs_service_account 
 import google.auth.exceptions as gcs_auth_exceptions
 from image_recognizer import get_image_labels_and_entities
 from gcs_uploader import upload_image_stream_to_gcs_for_user, \
-    ALLOWED_IMAGE_EXTENSIONS  # Keep allowed_file defined locally or import it too
+    ALLOWED_IMAGE_EXTENSIONS  
 from classifier import get_description, classify
 from semantic_search import process_activity_and_get_points
 from user import User
@@ -39,7 +39,6 @@ users_collection = db["users"]
 quests_collection = db["quests"]
 photos_collection = db["photos"]
 
-# --- GCS Client for Image Serving ---
 gcs_client_for_serving = None
 print(gcs_storage, gcs_service_account)
 if gcs_storage and gcs_service_account:
@@ -47,27 +46,23 @@ if gcs_storage and gcs_service_account:
 
     creds_info = json.loads(google_app_creds_json_string)
 
-    # Load credentials from the parsed dictionary
     credentials = gcs_service_account.Credentials.from_service_account_info(
         creds_info,
         scopes=['https://www.googleapis.com/auth/devstorage.read_write']
 
     )
-    project_id_from_creds = credentials.project_id  # Should be available from creds_info or inferred
+    project_id_from_creds = credentials.project_id 
 
-    # Manually setting universe_domain if needed.
-    # With from_service_account_info, it should pick up 'universe_domain' if present in creds_info.
+
     if not hasattr(credentials, 'universe_domain') or not credentials.universe_domain:
-        # Check if it's in the loaded info and try to set it
+
         if 'universe_domain' in creds_info:
             credentials.universe_domain = creds_info['universe_domain']
-        else:  # Default if not in JSON and not on object
-            # print("Attempting to manually set universe_domain on credentials object as a fallback.") # Debugging
+        else:  
             credentials.universe_domain = "googleapis.com"
         gcs_client_for_serving = gcs_storage.Client(credentials=credentials, project=creds_info.get("project_id"))
 
 
-# --- End GCS Client Init ---
 
 def get_user_session():
     return request.cookies.get('user_session')
@@ -108,7 +103,7 @@ def logout():
 
 
 @app.before_request
-def redirect_to_https():  # redirecting to https is needed for camera functionality
+def redirect_to_https(): 
     if 'DYNO' in os.environ and request.headers.get('X-Forwarded-Proto', 'http') != 'https':
         url = request.url.replace('http://', 'https://', 1)
         return redirect(url, code=301)
@@ -136,12 +131,11 @@ def index():
     return render_template("index.html")
 
 
-# --- Updated /quests route ---
 @app.route("/quests")
 def quests():
     user_session_id_str = get_user_session()
     if not user_session_id_str:
-        return redirect(url_for('login'))  # Use url_for
+        return redirect(url_for('login'))  
 
     try:
         user_object_id = ObjectId(user_session_id_str)
@@ -155,7 +149,7 @@ def quests():
         print(f"Checking for existing pending quests for user {user_session_id_str}...")
         pending_quests_docs = list(quests_collection.find({"user_to_id": user_session_id_str, "status": "pending"}))
 
-        quests_for_template = []  # This will hold quest data dictionaries for the template
+        quests_for_template = []  
 
         for quest_doc in pending_quests_docs:
             quest_obj = Quest.from_mongo(quest_doc)
@@ -181,22 +175,20 @@ def quests():
                 else:
                     print(
                         f"Quest {quest_obj.quest_id_str} was not regenerated after expiry check.")
-                continue  # Skip adding this expired quest to the display list
+                continue  
 
-            # Prepare quest data for template, including display URL for nomination image
             quest_display_data = quest_obj.to_mongo()
             quest_display_data['quest_id_str'] = quest_obj.quest_id_str
             quest_display_data['expiry_time_iso'] = quest_obj.expiry_time.isoformat() if quest_obj.expiry_time else None
-            quest_display_data['user_from_name'] = "System"  # Default
+            quest_display_data['user_from_name'] = "System" 
             if quest_obj.user_from_id:
-                # Attempt to fetch nominator's name
                 try:
                     nominator_user = User.get_user_by_id(users_collection, ObjectId(quest_obj.user_from_id))
                     if nominator_user:
                         quest_display_data['user_from_name'] = nominator_user.name
                     else:
                         quest_display_data['user_from_name'] = "An unknown friend"
-                except Exception:  # Invalid ObjectId or other DB error
+                except Exception:
                     quest_display_data['user_from_name'] = "A friend"
 
             if quest_obj.nominated_by_image_uri and quest_obj.nominated_by_image_uri.startswith("gs://"):
@@ -211,7 +203,6 @@ def quests():
                 quest_display_data['display_nomination_image_url'] = quest_obj.nominated_by_image_uri
             quests_for_template.append(quest_display_data)
 
-        # If no pending quests exist after expiry handling, generate a new one
         if not quests_for_template:
             print(
                 f"No pending quests for user {user_session_id_str} after expiry check. Generating a new system quest.")
@@ -232,16 +223,15 @@ def quests():
                 {"$push": {"quests": new_quest_id_str}}
             )
 
-            # Prepare this new quest for display
             new_quest_display_data = {
                 "quest_id_str": new_quest_id_str,
                 "user_to_id": new_quest_data["user_to_id"],
                 "target_category": new_quest_data["target_category"],
-                "expiry_time_iso": new_quest_data["expiry_time"].isoformat(),  # Use isoformat for template
+                "expiry_time_iso": new_quest_data["expiry_time"].isoformat(), 
                 "status": new_quest_data["status"],
                 "user_from_id": None,
                 "nominated_by_image_uri": None,
-                "display_nomination_image_url": None,  # No nomination image for system quest
+                "display_nomination_image_url": None,  
                 "user_from_name": "System"
             }
             quests_for_template = [new_quest_display_data]
@@ -257,11 +247,11 @@ def quests():
         return render_template("quests.html", user_quests=[], user_name=get_user_session(),
                                error_message="Could not load quests.")
 
-@app.route("/capture")  # Changed to accept quest_id as query parameter
+@app.route("/capture") 
 def capture():
     user_session_id = get_user_session()
 
-    quest_id_str = request.args.get('quest_id')  # Get quest_id from query parameter
+    quest_id_str = request.args.get('quest_id')  
     if not quest_id_str:
         print("No quest_id provided in query parameters for /capture route.")
         return redirect('/quests')
@@ -319,27 +309,22 @@ def onboarding_pg3():
 
         current_user = get_user_session()
 
-        # Generate quest data using the method from Quest class
-        # This assumes Quest.generate_new_system_quest_data is available and works as expected
-        # It returns a dictionary, not a Quest object directly, which is suitable for DB insertion.
+        
         target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
-        duration_seconds = 60 * 60  # Default 1 hours for an onboarding quest
+        duration_seconds = 60 * 60  
 
         new_quest_data = Quest.generate_new_system_quest_data(
-            user_to_id=current_user,  # Quest class expects user_to_id as string
+            user_to_id=current_user,  
             target_category=target_category,
             duration_seconds=duration_seconds
         )
 
-        # Save the new quest to the quests_collection
         result = quests_collection.insert_one(new_quest_data)
         new_quest_mongo_id = result.inserted_id
-        new_quest_id_str = new_quest_data["quest_id_str"]  # Get the app-level quest ID
-
+        new_quest_id_str = new_quest_data["quest_id_str"]  
         print(
             f"New onboarding quest {new_quest_id_str} created for user {current_user} with MongoDB ID {new_quest_mongo_id}.")
 
-        # Add the quest_id_str to the user's 'quests' list in their document
         update_user_result = users_collection.update_one(
             {"_id": current_user},
             {"$push": {"quests": new_quest_id_str}}
@@ -348,7 +333,6 @@ def onboarding_pg3():
         if update_user_result.modified_count > 0:
             print(f"Quest {new_quest_id_str} added to user {current_user}'s quest list.")
         else:
-            # This might happen if the user doc was found but update failed, or if $push didn't modify (e.g., already there, though unlikely for new quest)
             print(
                 f"Warning: User {current_user}'s quest list might not have been updated, or quest ID already present.")
 
@@ -357,10 +341,10 @@ def onboarding_pg3():
             "user_id": current_user,
             "quest_id_str": new_quest_id_str,
             "target_category": target_category,
-            "expiry_time": new_quest_data["expiry_time"].isoformat()  # Return expiry time
-        }), 201  # 201 Created
+            "expiry_time": new_quest_data["expiry_time"].isoformat() 
+        }), 201  
 
-    except RuntimeError as e:  # Catch if placeholder Quest functions are called
+    except RuntimeError as e:  
         print(f"A critical imported function for Quest generation is missing: {e}")
         return jsonify({"error": f"Server configuration error for quest generation: {e}"}), 500
     except Exception as e:
@@ -378,8 +362,7 @@ def friends():
         all_users_from_db = current_user.friends + [ObjectId(get_user_session())]
         user_objects = [User.get_user_by_id(users_collection, user_objectid) for user_objectid in all_users_from_db if
                         User.get_user_by_id(users_collection, user_objectid) is not None]
-        # Sort users by karma in descending order
-        # The User objects themselves will be sorted
+
         sorted_leaderboard_users = sorted(user_objects, key=lambda u: u.karma, reverse=True)
         sorted_leaderboard_users = [user for user in sorted_leaderboard_users]
         print(sorted_leaderboard_users[0].name)
@@ -388,13 +371,11 @@ def friends():
         print(f"Error fetching leaderboard data: {e}")
         import traceback
         traceback.print_exc()
-        # You might want to render an error page or return a JSON error
         return e, 500
 
 
 @app.route("/url_to_user", methods=["POST"])
 def url_to_user():
-    # loads a user from a qr code, creates a new user if user doesn't exist in db
     try:
         data = request.json
         if not data or "url" not in data:
@@ -410,7 +391,7 @@ def url_to_user():
         user = User.get_user(users_collection, jamhacks_code)
         print(user)
 
-        if user:  # skip creating a new user
+        if user:  
             return jsonify({
                 "user_id": str(user.id()),
                 "new_user": False
@@ -479,7 +460,7 @@ def upload_endpoint():
     if file and allowed_file(file.filename):
         original_filename = secure_filename(file.filename)
         gcs_uri = None
-        bucket_name_for_upload = "karma-videos"  # Explicitly define bucket
+        bucket_name_for_upload = "karma-videos"  
         session_results = {
             "original_filename": original_filename,
             "quest_completed_id": quest_id_str_being_completed,
@@ -528,7 +509,6 @@ def upload_endpoint():
                     session_results["message"] = "Previous quest was expired. A new quest has been generated."
                     session_results["new_quest_id"] = next_quest_data["quest_id_str"]
                     session_results["new_quest_category"] = next_quest_data["target_category"]
-                    # Add display_image_url for the new quest if it has a nominated_by_image_uri
                     if next_quest_data.get("nominated_by_image_uri"):
                         nom_bucket, nom_object = next_quest_data["nominated_by_image_uri"].replace("gs://", "").split(
                             "/", 1)
@@ -553,7 +533,6 @@ def upload_endpoint():
 
             print(f"Image uploaded to GCS: {gcs_uri}")
             session_results["gcs_uri"] = gcs_uri
-            # Generate display URL for the results page
             gcs_bucket_part, gcs_object_part = gcs_uri.replace("gs://", "").split("/", 1)
             session_results["display_image_url"] = url_for('serve_gcs_image', bucket_name=gcs_bucket_part,
                                                            object_path=gcs_object_part)
@@ -622,7 +601,6 @@ def upload_endpoint():
                     session_results["next_quest_id"] = new_quest_id_str
                     session_results["next_quest_for_user"] = recipient_user_id_str
                     session_results["next_quest_category"] = next_quest_data["target_category"]
-                    # Add display URL for nominated quest image if available
                     if next_quest_data.get("nominated_by_image_uri"):
                         nom_bucket_next, nom_object_next = next_quest_data["nominated_by_image_uri"].replace("gs://",
                                                                                                              "").split(
@@ -668,9 +646,8 @@ def serve_gcs_image(bucket_name: str, object_path: str):
 
         image_bytes = blob.download_as_bytes()
 
-        # Guess MIME type
         mime_type, _ = mimetypes.guess_type(object_path)
-        if not mime_type:  # Default if guess fails
+        if not mime_type: 
             if object_path.lower().endswith(('.jpg', '.jpeg')):
                 mime_type = 'image/jpeg'
             elif object_path.lower().endswith('.png'):
@@ -678,8 +655,7 @@ def serve_gcs_image(bucket_name: str, object_path: str):
             elif object_path.lower().endswith('.gif'):
                 mime_type = 'image/gif'
             else:
-                mime_type = 'application/octet-stream'  # Fallback
-
+                mime_type = 'application/octet-stream'  
         return send_file(io.BytesIO(image_bytes), mimetype=mime_type)
 
     except gcs_auth_exceptions.DefaultCredentialsError as e_auth:
@@ -743,7 +719,7 @@ def get_user_json():
             return jsonify({"error": "user_id is required"}), 400
 
         try:
-            user_id = ObjectId(data["user_id"])  # Convert to ObjectId
+            user_id = ObjectId(data["user_id"])  
         except Exception:
             return jsonify({"error": "Invalid user_id format"}), 400
 

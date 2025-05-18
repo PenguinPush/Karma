@@ -1,4 +1,3 @@
-#scorer.py
 import os
 import openai
 from dotenv import load_dotenv
@@ -20,7 +19,6 @@ except openai.OpenAIError as e:
     openai_client = None
 
 
-# Define the structure for the scoring output
 SCORING_TOOL_NAME = "set_societal_benefit_score"
 SCORING_TOOL_PARAMETERS = {
     "type": "object",
@@ -43,7 +41,7 @@ SCORING_TOOL_PARAMETERS = {
 def get_score(
         activity_description: str,
         detected_labels: list[str] | None = None,
-        classified_good_samaritan_category: str | None = None,  # New parameter
+        classified_good_samaritan_category: str | None = None,  
         model_name: str = "gpt-4o"
 ) -> dict[str, int | str] | None:
 
@@ -66,7 +64,6 @@ def get_score(
         }
     ]
 
-    # Updated system prompt to include the pre-classified category if available
     prompt_system = (
         "You are an AI assistant tasked with evaluating the societal benefit of described activities. "
         "Consider environmental impact, community well-being, health benefits, acts of kindness, "
@@ -102,8 +99,7 @@ def get_score(
     )
 
     print(f"\nSending request to OpenAI model ({model_name}) for societal benefit scoring...")
-    # print(f"System Prompt for Scorer: {prompt_system}")
-    # print(f"User Prompt for Scorer: {prompt_user}")
+ 
 
     try:
         completion = openai_client.chat.completions.create(
@@ -187,14 +183,13 @@ if __name__ == "__main__":
             print(f"\nGenerated Activity Description: {activity_description_from_ai}")
 
             print("\nStep 3: Classifying Good Samaritan category (from classifier.py)...")
-            # This function is expected to be imported from classifier.py
             good_samaritan_category = classify(
                 activity_description_from_ai,
                 labels_for_openai_processing
             )
             if good_samaritan_category is None:
                 print("Could not determine Good Samaritan category. Proceeding without this context for scoring.")
-                good_samaritan_category = "No Specific Good Samaritan Activity Detected"  # Default
+                good_samaritan_category = "No Specific Good Samaritan Activity Detected" 
             else:
                 print(f"Classified Good Samaritan Category: {good_samaritan_category}")
 
@@ -202,7 +197,7 @@ if __name__ == "__main__":
             score_info = get_score(
                 activity_description_from_ai,
                 labels_for_openai_processing,
-                good_samaritan_category  # Pass the category here
+                good_samaritan_category  
             )
 
             if score_info:
