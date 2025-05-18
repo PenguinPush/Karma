@@ -92,10 +92,11 @@
     {% if quest.user_from_id %}
     <h2>Nominated Quest</h2>
     <h3 class="username">By: {{ quest.user_from_id }}</h3> {# Consider fetching actual username in Flask #}
-    {% if quest.display_nomination_image_url %}
-                    <img src="{{ quest.display_nomination_image_url }}" alt="Nomination image" class="rtow-img"/>
-                {% else %}
-                    <img src="{{ url_for('static', filename='rtow.jpg') }}" alt="Default nomination image" class="rtow-img"/>
+    {% if quest.nominated_by_image_uri %}
+    <img src="{{ quest.nominated_by_image_uri }}" alt="Nomination image" class="rtow-img"/>
+    {% else %}
+    <img src="{{ url_for('static', filename='default_quest_image.png') }}" alt="Default quest image" class="rtow-img"/>
+    {# Fallback image #}
     {% endif %}
     {% else %}
     <div class="questbox-header">
