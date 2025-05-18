@@ -5,25 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
     <title>Karma | Quests</title>
     <link rel="stylesheet" href="../static/styles.css"/>
-    <style>
-        #slide-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #fff; /* Match your page background */
-            z-index: 9999;
-            transform: translateX(100vw);
-            transition: transform 0.5s cubic-bezier(.77, 0, .18, 1);
-            pointer-events: none;
-        }
-
-        #slide-overlay.active {
-            transform: translateX(0);
-            pointer-events: auto;
-        }
-    </style>
 </head>
 <body>
 <h1>Quests</h1>
@@ -39,11 +20,9 @@
 </div>
 <div class="navbar">
     <ul>
-        <li><a href="quests" class="button nav-link"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
         <li><a href="friends" class="button nav-link"><img src="../static/duooo.png" alt="leaderboard"></a></li>
-        <li><a href="capture" class="button largebutton nav-link"><img src="../static/BLACKADD.png" alt="capture"></a>
-        </li>
-        <li><a href="profile" class="button nav-link"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
+        <li><a href="quests" class="button nav-link"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
+        <li><a href="" class="button nav-link"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
     </ul>
 </div>
 <div id="slide-overlay"></div>

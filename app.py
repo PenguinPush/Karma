@@ -209,12 +209,11 @@ def friends():
         print(get_user_session())
         current_user = User.get_user_by_id(users_collection, get_user_session())
         all_users_from_db = current_user.friends + [ObjectId(get_user_session())]
-        real_users_from_db = [user for user in all_users_from_db if user is not None]
-        print([User.get_user_by_id(users_collection, user_objectid) for user_objectid in real_users_from_db])
+        user_objects = [User.get_user_by_id(users_collection, user_objectid) for user_objectid in all_users_from_db if User.get_user_by_id(users_collection, user_objectid) is not None]
         # Sort users by karma in descending order
         # The User objects themselves will be sorted
-        sorted_leaderboard_users = sorted(real_users_from_db, key=lambda u: User.get_user_by_id(users_collection, u).karma, reverse=True)
-        sorted_leaderboard_users = [User.get_user_by_id(users_collection, user_objectid) for user_objectid in sorted_leaderboard_users]
+        sorted_leaderboard_users = sorted(user_objects, key=lambda u: u.karma, reverse=True)
+        sorted_leaderboard_users = [user for user in sorted_leaderboard_users]
         print(sorted_leaderboard_users[0].name)
         return render_template('friends.html', leaderboard_users=sorted_leaderboard_users)
     except Exception as e:
