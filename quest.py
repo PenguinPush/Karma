@@ -14,12 +14,12 @@ load_dotenv()
 POSSIBLE_QUEST_CATEGORIES = [
     "Recycling Activity",
     "Litter Pickup",
-    "Using Public Transit",
-    "Environmental Care",
-    "Self-Care Activity",
-    "Helping Others (General)",
-    "Community Involvement",
-    "Creativity and Learning"
+    # "Using Public Transit",
+    # "Environmental Care",
+    # "Self-Care Activity",
+    # "Helping Others (General)",
+    # "Community Involvement",
+    # "Creativity and Learning"
 ]
 
 
