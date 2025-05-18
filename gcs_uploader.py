@@ -1,20 +1,15 @@
 import os
 import uuid  
 from dotenv import load_dotenv
-
-
-
+import json
+import mimetypes
+storage = None
 from google.cloud import storage
-
 import google.auth
-
 google_auth = google.auth
 from google.oauth2 import service_account as oauth2_service_account
-
 google_oauth2_service_account = oauth2_service_account
-
 import google.auth.exceptions
-
 google_auth_exceptions = google.auth.exceptions
 
 load_dotenv()

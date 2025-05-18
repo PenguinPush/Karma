@@ -5,6 +5,117 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Karma | Profile</title>
     <link rel="stylesheet" href="../static/styles.css">
+    <style>
+
+        .leaderboard {
+            width: 90%;
+            max-width: 600px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 5px 0;
+        }
+
+
+        .entry {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .entry:last-child {
+            border-bottom: none;
+        }
+
+        .entry:hover {
+            background-color: #f5f5f5;
+        }
+
+
+        .placement {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #007bff;
+            margin-right: 15px;
+            width: 30px;
+            text-align: center;
+        }
+
+        .user {
+            font-size: 1em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .points {
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .addfriendsbutton {
+            position: relative;
+            text-align: center;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .addfriendsbutton h3 a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 1.1em;
+            padding: 8px 10px;
+            border-radius: 5px;
+            transition: background-color 0.2s, color 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .addfriendsbutton img {
+            vertical-align: middle;
+            margin-right: 5px;
+            width: 20px;
+            height: 20px;
+            white-space: nowrap;
+            overflow: hidden;
+
+
+            .entry {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 10px;
+                border-bottom: 1px solid #eee;
+                transition: background-color 0.2s ease-in-out;
+                flex-wrap: nowrap;
+            }
+
+            .info {
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 1;
+                min-width: 0;
+            }
+
+            .user, .points {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .socials {
+                margin-top: 200px;
+                width: 100%; /* Adjusted to make it take the full width */
+                max-width: 1200px; /* Optional: Set a maximum width */
+                margin-left: auto; /* Center align */
+                margin-right: auto; /* Center align */
+            }
+        }
+    </style>
 </head>
 <body>
 <br>
@@ -12,7 +123,10 @@
     <h1 id="name">Username</h1>
     <h3 id="karma">Total Karma: 10 limbillion</h3>
 </div>
-<div class="allimages">
+<div class="socials">
+    <br>
+    <h2>Social Media</h2>
+    <div class="leaderboard" id="socials-container"></div>
 </div>
 <div class="navbar">
     <ul>
@@ -38,18 +152,33 @@
             document.getElementById("name").innerHTML = name;
             document.getElementById("karma").innerHTML = "Total Karma: " + karma.toString();
 
-            const container = document.querySelector(".allimages");
-            for (let i = 0; i < photo_urls.length; i++) {
-                const div = document.createElement("div");
-                div.classList.add("image");
+            const socialsContainer = document.getElementById("socials-container");
 
-                const img = document.createElement("img");
-                img.src = photo_urls[i];
-                img.alt = photo_quest_ids[i];
+            socials.forEach((social, index) => {
+                const entry = document.createElement("div");
+                entry.classList.add("entry");
 
-                div.appendChild(img);
-                container.appendChild(div);
-            }
+                // Placement number
+                const placement = document.createElement("p");
+                placement.classList.add("placement");
+                placement.textContent = index + 1;
+
+                // Clickable social media link
+                const info = document.createElement("div");
+                info.classList.add("info");
+                const link = document.createElement("a");
+                link.href = social;
+                link.target = "_blank";
+                link.textContent = social;
+                info.appendChild(link);
+
+                // Append placement and link to the entry
+                entry.appendChild(placement);
+                entry.appendChild(info);
+
+                // Add the entry to the container
+                socialsContainer.appendChild(entry);
+            });
         }
     });
 </script>
