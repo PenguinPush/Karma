@@ -2,7 +2,7 @@ import certifi
 import os
 import random
 
-from flask import Flask, request, jsonify, redirect, make_response, render_template
+from flask import Flask, request, jsonify, redirect, make_response, render_template, session, url_for
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from pymongo import MongoClient
@@ -21,8 +21,9 @@ from photo import Photo
 from quest import Quest, POSSIBLE_QUEST_CATEGORIES
 
 load_dotenv()
-
 app = Flask(__name__)
+
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 scraper = Scraper()
 
 MONGO_URI = os.getenv("MONGO_CONNECTION_STRING")
@@ -41,7 +42,7 @@ def get_user_session():
 def allowed_file(filename):
     """Checks if the file's extension is allowed."""
     return '.' in filename and \
-        filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
+           filename.rsplit('.', 1)[1].lower() in {ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS}
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -207,8 +208,6 @@ def quests():
 @app.route("/capture")  # Changed to accept quest_id as query parameter
 def capture():
     user_session_id = get_user_session()
-    if not user_session_id:
-        return redirect('/login')
 
     quest_id_str = request.args.get('quest_id')  # Get quest_id from query parameter
     if not quest_id_str:
@@ -222,6 +221,7 @@ def capture():
             f"Invalid, non-pending, or non-existent quest {quest_id_str} for user {user_session_id} accessed via /capture.")
         return redirect('/quests')
     return render_template("capture.html", quest_id_str=quest_id_str)
+
 
 @app.route("/onboarding_pg0")
 def onboarding_pg0():
@@ -405,102 +405,191 @@ def get_dynamsoft_license():
 
 @app.route('/upload_endpoint', methods=['POST'])
 def upload_endpoint():
-    if 'image_file' not in request.files:
-        return jsonify({"error": "No image file part in the request."}), 400
-    print(request.form)
+    if 'image_file' not in request.files: return jsonify({"error": "No image file part in the request."}), 400
+
     file = request.files['image_file']
-    user_id_str = get_user_session()
-    quest_id_str = request.form.get('quest_id_str')
+    uploader_user_id_str = get_user_session()
+    quest_id_str_being_completed = request.form.get('quest_id_str')
 
-    if not user_id_str:
-        return jsonify({"error": "User ID is required."}), 400
-
-    if not quest_id_str:
-        return jsonify({"error": "Quest ID is required."}), 400
-
+    if not uploader_user_id_str:
+        session['upload_results'] = {"error": "User not authenticated (no session).", "status_code": 401}
+        return redirect('/results')
+    if not quest_id_str_being_completed:
+        session['upload_results'] = {"error": "Quest ID (quest_id_str) is required in form data for completion.",
+                                     "status_code": 400}
+        return redirect('/results')
     if file.filename == '':
-        return jsonify({"error": "No image selected for uploading."}), 400
+        session['upload_results'] = {"error": "No image selected for uploading.", "status_code": 400}
+        return redirect('/results')
 
     if file and allowed_file(file.filename):
         original_filename = secure_filename(file.filename)
+        gcs_uri = None
+        session_results = {"original_filename": original_filename,
+                           "quest_completed_id": quest_id_str_being_completed}  # Initialize session_results
+
         try:
+            uploader_user_obj_id = ObjectId(uploader_user_id_str)
+            uploader_user = User.get_user_by_id(users_collection, uploader_user_obj_id)
+            if not uploader_user:
+                session['upload_results'] = {"error": "Uploader user not found.", "status_code": 404}
+                return redirect('/results')
+
+            quest_to_complete = Quest.get_quest_by_quest_id_str(quests_collection, quest_id_str_being_completed)
+            if not quest_to_complete:
+                session['upload_results'] = {"error": f"Quest {quest_id_str_being_completed} not found.",
+                                             "status_code": 404}
+                return redirect('/results')
+            if quest_to_complete.user_to_id != uploader_user_id_str:
+                session['upload_results'] = {"error": "This quest does not belong to the current user.",
+                                             "status_code": 403}
+                return redirect('/results')
+            if quest_to_complete.status != "pending":
+                session['upload_results'] = {
+                    "error": f"Quest {quest_id_str_being_completed} is not pending (current status: {quest_to_complete.status}).",
+                    "status_code": 400}
+                return redirect('/results')
+
+            if quest_to_complete.is_expired():
+                print(f"Quest {quest_id_str_being_completed} is expired. Handling expiry...")
+                next_quest_data = quest_to_complete.handle_expiry_and_regenerate_data(quests_collection,
+                                                                                      POSSIBLE_QUEST_CATEGORIES)
+                if next_quest_data:
+                    quests_collection.insert_one(next_quest_data)
+                    users_collection.update_one({"_id": uploader_user_obj_id},
+                                                {"$pull": {"quests": quest_id_str_being_completed}})
+                    users_collection.update_one({"_id": uploader_user_obj_id},
+                                                {"$push": {"quests": next_quest_data["quest_id_str"]}})
+                    session_results["message"] = "Previous quest was expired. A new quest has been generated."
+                    session_results["new_quest_id"] = next_quest_data["quest_id_str"]
+                    session_results["new_quest_category"] = next_quest_data["target_category"]
+                else:
+                    session_results["message"] = "Previous quest was expired but new quest generation failed."
+                session['upload_results'] = session_results
+                return redirect('/results')
+
             gcs_uri = upload_image_stream_to_gcs_for_user(
                 file_stream=file,
                 original_filename=original_filename,
-                user_id_folder=user_id_str,
+                user_id_folder=uploader_user_id_str,
+                bucket_name="karma-videos",  # Explicitly set
                 content_type=file.content_type
             )
             if not gcs_uri:
-                return jsonify({"error": "Image upload to Google Cloud Storage failed."}), 500
+                session['upload_results'] = {"error": "Image upload to GCS failed.", "gcs_uri": None,
+                                             "status_code": 500}
+                return redirect('/results')
+            print(f"Image uploaded to GCS: {gcs_uri}")
+            session_results["gcs_uri"] = gcs_uri
 
             image_labels_dict = get_image_labels_and_entities(gcs_uri)
             if not image_labels_dict or "error" in image_labels_dict:
-                error_msg = image_labels_dict.get("error", "Failed to get image labels.")
-                return jsonify({"error": f"Label extraction failed: {error_msg}", "gcs_uri": gcs_uri}), 500
-
+                error_msg = image_labels_dict.get("error", "Label extraction failed.") if isinstance(image_labels_dict,
+                                                                                                     dict) else "Label extraction failed."
+                session_results["error"] = error_msg
+                session_results["status_code"] = 500
+                session['upload_results'] = session_results
+                return redirect('/results')
             formatted_labels = [f"{desc.capitalize()} (Score: {score:.2f})" for desc, score in
                                 image_labels_dict.items()]
-            img_activity_description = get_description(formatted_labels) or "No activity description."
-            good_samaritan_category = classify(img_activity_description, formatted_labels) or "Unclassified"
-            karma_points_info = process_activity_and_get_points(
-                activity_category=good_samaritan_category,
-                activity_description=img_activity_description,
-                detected_labels=formatted_labels
-            )
+            session_results["image_labels"] = formatted_labels
 
-            try:
-                user_object_id = ObjectId(user_id_str)
-                update_result = users_collection.update_one(
-                    {"_id": user_object_id},
-                    {
-                        "$inc": {"karma": karma_points_info},
-                    }
+            img_activity_description = get_description(formatted_labels) or "Activity could not be described."
+            session_results["activity_description"] = img_activity_description
+            good_samaritan_category = classify(img_activity_description,
+                                               formatted_labels) or "No Specific Good Samaritan Activity Detected"
+            session_results["classified_category"] = good_samaritan_category
+
+            karma_points_awarded = process_activity_and_get_points(good_samaritan_category, img_activity_description,
+                                                                   formatted_labels)
+            print(f"Karma points calculated: {karma_points_awarded}")
+            session_results["karma_points_awarded"] = karma_points_awarded
+
+            if karma_points_awarded > 0:
+                # Use Quest object's method to handle completion and get data for next quest
+                # The handle_completion_and_nominate method in Quest class now saves the completed quest
+                # and then deletes it, returning data for the next quest.
+                next_quest_data = quest_to_complete.handle_completion_and_nominate(
+                    completion_image_uri=gcs_uri,
+                    user_friends_list=[str(f) for f in uploader_user.friends],
+                    quests_collection=quests_collection,
                 )
-                current_user_karma = "User not found" if update_result.matched_count == 0 else users_collection.find_one(
-                    {"_id": user_object_id}, {"karma": 1}
-                ).get("karma", "Karma not found")
-            except Exception as e_db_update:
-                current_user_karma = "Error during karma update"
-                print(f"DB error: {e_db_update}")
 
-            # Save photo referencing user and quest
-            completed_quest = Quest.get_quest_by_quest_id_str(quests_collection=quests_collection, quest_id_str=quest_id_str)
-            new_photo = Photo(user_id=ObjectId(user_id_str), quest_id=completed_quest.mongo_id, url=gcs_uri)
-            new_photo.save_to_db(photos_collection)
+                users_collection.update_one(
+                    {"_id": uploader_user_obj_id},
+                    {"$inc": {"karma": karma_points_awarded}}
+                    # $push photos is now handled by Photo class if used, or directly if not
+                )
+                # Save the Photo object
+                try:
+                    if 'Photo' in globals() and quest_to_complete.mongo_id:  # Check if Photo class is available
+                        new_photo = Photo(user_id=uploader_user_obj_id, quest_id=quest_to_complete.mongo_id,
+                                          url=gcs_uri)
+                        new_photo.save_to_db(photos_collection)
+                        users_collection.update_one({"_id": uploader_user_obj_id},
+                                                    {"$push": {"photos": new_photo._id}})  # Store Photo ObjectId
+                        print(f"Photo object saved with ID: {new_photo._id}")
+                    else:  # Fallback to just storing GCS URI if Photo class isn't used/available
+                        users_collection.update_one({"_id": uploader_user_obj_id}, {"$push": {"photos": gcs_uri}})
+                        print(
+                            "Photo class not available or quest mongo_id missing, storing GCS URI directly in user photos.")
 
-            users_collection.update_one(
-                {"_id": ObjectId(user_id_str)},
-                {"$push": {"photos": new_photo.id()}}
-            )
+                except Exception as e_photo:
+                    print(f"Error saving Photo object or updating user photos: {e_photo}")
 
-            # Insert reference into quest, mark as complete
-            quests_collection.update_one(
-                {"_id": quest_id_str},
-                {"$set": {
-                    "completion_image_uri": new_photo.id(),
-                    "status": "complete"
-                }}
-            )
+                updated_user_doc = users_collection.find_one({"_id": uploader_user_obj_id}, {"karma": 1})
+                session_results["user_current_karma"] = updated_user_doc.get("karma") if updated_user_doc else "N/A"
+                session_results[
+                    "completion_message"] = f"Quest '{quest_id_str_being_completed}' completed! Points awarded: {karma_points_awarded}."
 
-            return jsonify({
-                "message": f"Image '{original_filename}' processed successfully for user '{user_id_str}'.",
-                "quest_id": quest_id_str,
-                "gcs_uri": gcs_uri,
-                "image_labels": formatted_labels,
-                "activity_description": img_activity_description,
-                "classified_category": good_samaritan_category,
-                "karma_points_awarded": karma_points_info,
-                "user_current_karma": current_user_karma
-            }), 200
+                if next_quest_data:
+                    quests_collection.insert_one(next_quest_data)
+                    new_quest_id_str = next_quest_data["quest_id_str"]
+                    recipient_user_id_str = next_quest_data["user_to_id"]
 
+                    users_collection.update_one(
+                        {"_id": ObjectId(recipient_user_id_str)},
+                        {"$push": {"quests": new_quest_id_str}}
+                    )
+                    session_results["next_quest_id"] = new_quest_id_str
+                    session_results["next_quest_for_user"] = recipient_user_id_str
+                    session_results["next_quest_category"] = next_quest_data["target_category"]
+                    print(f"New quest {new_quest_id_str} created for user {recipient_user_id_str}.")
+                else:
+                    print(f"No next quest data generated after completing {quest_id_str_being_completed}.")
+                    session_results["completion_message"] += " No further quest nominated/generated."
+            else:
+                session_results[
+                    "completion_message"] = "Deed submitted, but no karma points awarded. Quest not marked as completed."
+
+            session['upload_results'] = session_results
+            return redirect('/results')
+
+        except RuntimeError as e:
+            session['upload_results'] = {"error": f"Server config error: {e}", "status_code": 500}
+            return redirect('/results')
         except Exception as e:
-            print(f"Error in /upload_endpoint route: {e}")
-            import traceback
+            import traceback;
             traceback.print_exc()
-            return jsonify({"error": f"Server error: {str(e)}"}), 500
+            session['upload_results'] = {"error": f"Unexpected error: {str(e)}", "status_code": 500}
+            return redirect('/results')
     else:
-        allowed_ext_str = ", ".join(sorted([ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS]))
-        return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
+        session['upload_results'] = {"error": f"Invalid file type. Allowed: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}",
+                                     "status_code": 400}
+        return redirect('/results')
+
+
+
+@app.route('/results')
+def results():
+    print(session)
+    results = session.get("upload_results")
+    print(results)
+    print("b")
+    if results is None:
+        print('ansnn')
+        return redirect('/quests')
+    return render_template('results.html', results=results)
 
 
 @app.route("/upload_photo")
@@ -554,16 +643,7 @@ def get_user_json():
 
         friends = [str(friend) for friend in user.get("friends", [])]
         quests = [str(quest) for quest in user.get("quests", [])]
-        photo_ids = [ObjectId(photo) for photo in user.get("photos", [])]
-
-        photo_docs = list(photos_collection.find({"_id": {"$in": photo_ids}}))
-        photo_urls = []
-        photo_quest_ids = []
-
-        for doc in photo_docs:
-            photo_urls.append(doc.get("url"))
-            photo_quest_ids.append(str(doc.get("quest_id")))
-            print(doc.get("url"))
+        photos = [str(photo) for photo in user.get("photos", [])]
 
         return jsonify({
             "jamhacks_code": user.get("jamhacks_code"),
@@ -573,8 +653,7 @@ def get_user_json():
             "phone": user.get("phone"),
             "friends": friends,
             "quests": quests,
-            "photo_urls": photo_urls,
-            "photo_quest_ids": photo_quest_ids
+            "photos": photos,
         })
 
     except Exception as e:

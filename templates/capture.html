@@ -12,22 +12,23 @@
     <div class="camera-container">
         <p style="color: #555;">Quest ID: {{ quest_id_str }}</p>
         <div class="camera-feed">
-            <video id="video" width="320" height="240" autoplay playsinline></video> {# Added playsinline for iOS #}
+            <video id="video" width="320" height="240" autoplay playsinline></video>
+            <canvas id="canvas" style="display: none;"></canvas>
             <button id="take-photo">Take Photo</button>
-            <canvas id="canvas" style="display: none;"></canvas> {# Keep canvas for drawing frame #}
+            <button id="submit-captured-photo">Submit Captured Photo</button>
         </div>
+        <hr style="margin: 20px 0;">
         <div class="upload-container">
-            <p>Or, if you already have an image:</p>
+            <p>Or, upload an existing image:</p>
             <form id="uploadFormFallback" method="post" enctype="multipart/form-data" action="{{ url_for('upload_endpoint') }}">
                 <input type="hidden" name="quest_id_str" value="{{ quest_id_str }}">
                 <label for="image-upload-fallback" class="upload-button">
-                    Upload Existing Image
+                    Choose File
                 </label>
                 <input type="file" id="image-upload-fallback" name="image_file" accept="image/*" style="display: none;">
-                {# This form will submit traditionally or can be enhanced with JS #}
             </form>
         </div>
-        <div id="responseMessage"></div>
+        {# Removed responseMessage div; using alerts for simplicity now #}
     </div>
 
 
@@ -36,100 +37,122 @@
         const canvas = document.getElementById('canvas');
         const context = canvas.getContext('2d');
         const takePhotoButton = document.getElementById('take-photo');
-        const responseMessageDiv = document.getElementById('responseMessage');
-        const questId = "{{ quest_id_str }}"; // Get quest_id from Flask template
-        const uploadEndpoint = "{{ url_for('upload_endpoint') }}"; // Get endpoint URL from Flask
+        const submitCapturedPhotoButton = document.getElementById('submit-captured-photo');
+        const questId = "{{ quest_id_str }}";
+        const uploadEndpoint = "{{ url_for('upload_endpoint') }}"; // Ensure this matches your Flask route name
 
-        // Access the camera
+        let capturedImageBlob = null;
+
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }) // Prefer back camera
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
                 .then(function(stream) {
                     video.srcObject = stream;
                     video.play();
                 })
                 .catch(function(err) {
                     console.error("Error accessing the camera: ", err);
-                    responseMessageDiv.style.display = 'block';
-                    responseMessageDiv.className = 'error';
-                    responseMessageDiv.textContent = 'Could not access camera: ' + err.message;
+                    alert('Could not access camera: ' + err.message);
                 });
         } else {
             console.error("getUserMedia not supported on your browser!");
-            responseMessageDiv.style.display = 'block';
-            responseMessageDiv.className = 'error';
-            responseMessageDiv.textContent = 'Camera access is not supported by your browser.';
+            alert('Camera access is not supported by your browser.');
         }
 
-        // Take photo and upload
         takePhotoButton.addEventListener('click', function() {
-            // Set canvas dimensions to video dimensions
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            responseMessageDiv.style.display = 'block';
-            responseMessageDiv.className = 'info';
-            responseMessageDiv.textContent = 'Processing and uploading photo...';
+            canvas.style.display = 'block';
+            video.style.display = 'none';
+            takePhotoButton.textContent = 'Retake Photo';
+            submitCapturedPhotoButton.style.display = 'inline-block';
 
             canvas.toBlob(function(blob) {
-                const formData = new FormData();
-                // Create a filename for the blob, e.g., "capture.png"
-                // The server-side (gcs_uploader) will generate a more unique name for GCS.
-                const fileName = `capture_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
-                formData.append('image_file', blob, fileName);
-                formData.append('quest_id_str', questId);
-                // user_id is handled by session on the server in your /upload_endpoint
-
-                fetch(uploadEndpoint, {
-                    method: 'POST',
-                    body: formData,
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.gcs_uri) { // Check for gcs_uri as success indicator
-                        responseMessageDiv.className = 'success';
-                        responseMessageDiv.textContent = result.message || 'Upload successful!';
-                        if (result.gcs_uri) {
-                            responseMessageDiv.textContent += ` Image URI: ${result.gcs_uri}.`;
-                        }
-                        if (result.karma_points_awarded !== undefined) {
-                             responseMessageDiv.textContent += ` Points Awarded: ${result.karma_points_awarded}.`;
-                        }
-                        // Redirect to quests page after a delay
-                        setTimeout(() => {
-                            window.location.href = "{{ url_for('quests') }}";
-                        }, 3000);
-                    } else {
-                        responseMessageDiv.className = 'error';
-                        responseMessageDiv.textContent = `Error: ${result.error || 'Upload failed. Check server logs.'}`;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error uploading image:', error);
-                    responseMessageDiv.className = 'error';
-                    responseMessageDiv.textContent = 'Error uploading image. Check console.';
-                });
-            }, 'image/png'); // Specify image format for the blob
+                capturedImageBlob = blob;
+            }, 'image/png');
         });
 
-        // Handle fallback file input change for traditional form submission
+        submitCapturedPhotoButton.addEventListener('click', function() {
+            if (!capturedImageBlob) {
+                alert("Please take a photo first using the 'Retake Photo' button.");
+                return;
+            }
+
+            const formData = new FormData();
+            const fileName = `captured_quest_${questId}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+            formData.append('image_file', capturedImageBlob, fileName);
+            formData.append('quest_id_str', questId);
+
+            sendFormData(formData);
+        });
+
         const fallbackInput = document.getElementById('image-upload-fallback');
         const fallbackForm = document.getElementById('uploadFormFallback');
         if (fallbackInput && fallbackForm) {
             fallbackInput.addEventListener('change', function() {
                 if (this.files && this.files[0]) {
-                    // Optionally, you could use the same fetch logic here for consistency,
-                    // or let the form submit traditionally. For now, it's a traditional submit.
-                    // To use fetch, you'd preventDefault and then construct FormData like above.
-                    console.log("File selected via fallback, submitting form traditionally.");
-                    // To make this also use fetch and show messages:
-                    // fallbackForm.dispatchEvent(new Event('submit', { cancelable: true })); // if you add a submit listener to fallbackForm
-                    // For simplicity, this example will let it submit traditionally if JS is not enhanced for it.
-                    // If you want the same JS handling for this input, you'd need to add that logic.
+                    console.log("File selected via fallback input. Submitting form data via fetch...");
+                    const formData = new FormData(fallbackForm);
+                    sendFormData(formData);
                 }
             });
         }
 
+        async function sendFormData(formData) {
+            if (submitCapturedPhotoButton) submitCapturedPhotoButton.disabled = true;
+            if (fallbackInput) fallbackInput.disabled = true;
+            // Consider adding a visual "loading" indicator here if desired
+
+            try {
+                const response = await fetch(uploadEndpoint, {
+                    method: 'POST',
+                    body: formData,
+                    // redirect: 'follow' is the default behavior for fetch
+                });
+
+                // If the server responded with a redirect (e.g., to /results),
+                // fetch will have followed it. The 'response.url' will be the final URL.
+                // We need to explicitly navigate the browser to this final URL.
+                if (response.ok) { // Checks if the final status code is 200-299
+                    console.log("Request successful. Final URL:", response.url);
+                    // Force navigation to the final URL (which should be the /results page)
+                    window.location.href = response.url;
+                } else {
+                    // This block is reached if the *final* response after any redirects was an error
+                    // (e.g., 404 or 500 on the /results page itself),
+                    // OR if the initial POST to /upload_endpoint returned an error *without* redirecting
+                    // (though your Flask app is set to redirect with session data for errors).
+                    console.error("Request failed or final page load failed. Status:", response.status, response.statusText, "Final URL:", response.url);
+                    const contentType = response.headers.get("content-type");
+                    let errorMsg = `Upload failed. Status: ${response.status}.`;
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        try {
+                            const errorResult = await response.json();
+                            errorMsg = `Upload failed: ${errorResult.error || 'Server error (JSON)'}`;
+                        } catch (e) {
+                            console.error("Could not parse error JSON:", e);
+                            errorMsg += " Could not parse server error message.";
+                        }
+                    } else {
+                        // If not JSON, it might be an HTML error page from Flask
+                        const errorText = await response.text();
+                        console.error("Server response (HTML or text):", errorText.substring(0, 500));
+                        errorMsg += " The server might be down or an unexpected error occurred.";
+                    }
+                    alert(errorMsg);
+                    // Re-enable buttons on error if not redirecting
+                    if (submitCapturedPhotoButton) submitCapturedPhotoButton.disabled = false;
+                    if (fallbackInput) fallbackInput.disabled = false;
+                }
+
+            } catch (error) { // Network error or other JS error during fetch
+                console.error('Error submitting form data:', error);
+                alert('An error occurred while trying to upload. Please check your network connection and try again.');
+                if (submitCapturedPhotoButton) submitCapturedPhotoButton.disabled = false;
+                if (fallbackInput) fallbackInput.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>
