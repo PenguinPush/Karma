@@ -171,6 +171,8 @@ def classify(
         "the category should be 'No Specific Good Samaritan Activity Detected'."
         "Anything related to recycling, bottles, or plastic is likely related to recycling, and "
         "Anything involving trash or picking up is likely related to litter."
+        "Things involving paper, computers, pens, or pencils are likely related to creativity and learning"
+
     )
 
     prompt_user = (

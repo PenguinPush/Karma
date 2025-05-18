@@ -204,10 +204,24 @@ def quests():
                                error_message="Could not load quests.")
 
 
-@app.route("/capture")
+@app.route("/capture")  # Changed to accept quest_id as query parameter
 def capture():
-    return render_template("capture.html")
+    user_session_id = get_user_session()
+    if not user_session_id:
+        return redirect('/login')
 
+    quest_id_str = request.args.get('quest_id')  # Get quest_id from query parameter
+    if not quest_id_str:
+        print("No quest_id provided in query parameters for /capture route.")
+        return redirect('/quests')
+
+    quest_doc = quests_collection.find_one(
+        {"quest_id_str": quest_id_str, "user_to_id": user_session_id, "status": "pending"})
+    if not quest_doc:
+        print(
+            f"Invalid, non-pending, or non-existent quest {quest_id_str} for user {user_session_id} accessed via /capture.")
+        return redirect('/quests')
+    return render_template("capture.html", quest_id_str=quest_id_str)
 
 @app.route("/onboarding_pg0")
 def onboarding_pg0():
@@ -393,10 +407,10 @@ def get_dynamsoft_license():
 def upload_endpoint():
     if 'image_file' not in request.files:
         return jsonify({"error": "No image file part in the request."}), 400
-
+    print(request.form)
     file = request.files['image_file']
     user_id_str = get_user_session()
-    quest_id_str = request.form.get('quest_id')
+    quest_id_str = request.form.get('quest_id_str')
 
     if not user_id_str:
         return jsonify({"error": "User ID is required."}), 400
@@ -450,7 +464,8 @@ def upload_endpoint():
                 print(f"DB error: {e_db_update}")
 
             # Save photo referencing user and quest
-            new_photo = Photo(user_id=ObjectId(user_id_str), quest_id=ObjectId(quest_id_str), url=gcs_uri)
+            completed_quest = Quest.get_quest_by_quest_id_str(quests_collection=quests_collection, quest_id_str=quest_id_str)
+            new_photo = Photo(user_id=ObjectId(user_id_str), quest_id=completed_quest.mongo_id, url=gcs_uri)
             new_photo.save_to_db(photos_collection)
 
             users_collection.update_one(
@@ -460,7 +475,7 @@ def upload_endpoint():
 
             # Insert reference into quest, mark as complete
             quests_collection.update_one(
-                {"_id": ObjectId(quest_id_str)},
+                {"_id": quest_id_str},
                 {"$set": {
                     "completion_image_uri": new_photo.id(),
                     "status": "complete"
