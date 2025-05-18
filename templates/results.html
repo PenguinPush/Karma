@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karma | Quest Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        /* Minimal additional styling for structure and appeal */
+        /* You can integrate these into your universal styles.css */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            padding: 25px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+        h2 {
+            font-size: 1.4em;
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .message-box {
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 6px;
+            font-size: 1.05em;
+            text-align: center;
+            border-width: 1px;
+            border-style: solid;
+        }
+        .message-box.success {
+            color: #1d643b;
+            background-color: #d1f7e0;
+            border-color: #a3e9c1;
+        }
+        .message-box.error {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .message-box.info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+        .result-item {
+            margin-bottom: 12px;
+            padding: 8px 0;
+        }
+        .result-item strong {
+            color: #555;
+            display: inline-block;
+            min-width: 180px; /* For alignment */
+        }
+        .result-photo-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .result-photo {
+            max-width: 100%;
+            max-height: 400px; /* Limit image height */
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .labels-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        .labels-list li {
+            background-color: #ecf0f1;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            display: inline-block; /* Make labels flow nicely */
+            margin-right: 5px;
+        }
+        .button-container { /* For the "Back to Quests" button */
+            text-align: center;
+            margin-top: 30px;
+        }
+        .button-primary {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1.05em;
+            transition: background-color 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .button-primary:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Quest Completion Results</h1>
+
+        {% if results %}
+            {# Display Success/Failure Message #}
+            {% if results.error %}
+                <div class="message-box error">
+                    <p><strong>Status:</strong> Quest Processing Failed</p>
+                    <p>{{ results.error }}</p>
+                    {% if results.gcs_uri %}
+                        <p><small>Image was uploaded to: {{ results.gcs_uri }} but processing failed.</small></p>
+                    {% endif %}
+                </div>
+            {% elif results.completion_message %}
+                <div class="message-box success">
+                    <p><strong>Status:</strong> {{ "Quest Completed Successfully!" if results.karma_points_awarded > 0 else "Image Processed" }}</p>
+                    <p>{{ results.completion_message | safe }}</p>
+                </div>
+            {% else %}
+                 <div class="message-box info">
+                    <p>Image processing is complete.</p>
+                 </div>
+            {% endif %}
+
+            {# Display Photo Taken #}
+            {% if results.gcs_uri %}
+                <div class="result-photo-container">
+                    <h2>Submitted Photo</h2>
+                    {# IMPORTANT: For this to work, results.gcs_uri must be a publicly accessible HTTPS URL.
+                         If it's a gs:// URI, you'll need a backend endpoint to serve the image.
+                         Alternatively, if your GCS bucket objects are public, you can construct
+                         the public URL: https://storage.googleapis.com/YOUR_BUCKET_NAME/OBJECT_PATH #}
+                    <img src="{{ results.gcs_uri }}" alt="Uploaded Quest Photo" class="result-photo"
+                         onerror="this.alt='Image preview not available. Ensure GCS URI is a public HTTPS URL or served via your app.'; this.style.display='none';">
+                    <p><small>GCS URI: {{ results.gcs_uri }}</small></p>
+                </div>
+            {% endif %}
+
+            {# --- Image & Analysis Details --- #}
+            <div class="result-section">
+                <h2>Image & Analysis Details</h2>
+                {% if results.original_filename %}
+                <div class="result-item"><p><strong>Original File:</strong> {{ results.original_filename }}</p></div>
+                {% endif %}
+
+                {% if results.activity_description %}
+                <div class="result-item"><p><strong>AI Description:</strong> {{ results.activity_description }}</p></div>
+                {% endif %}
+
+                {% if results.classified_category %}
+                <div class="result-item"><p><strong>AI Classified Activity Type:</strong> {{ results.classified_category }}</p></div>
+                {% endif %}
+
+                {% if results.image_labels %}
+                <div class="result-item">
+                    <p><strong>Detected Image Labels:</strong></p>
+                    <ul class="labels-list">
+                        {% for label in results.image_labels %}
+                            <li>{{ label }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+
+            {# --- Quest & Karma --- #}
+            <div class="result-section">
+                <h2>Quest & Karma</h2>
+                {% if results.quest_completed_id %}
+                <div class="result-item"><p><strong>Processed Quest ID:</strong> {{ results.quest_completed_id }}</p></div>
+                {% endif %}
+                {% if results.karma_points_awarded is not none %}
+                <div class="result-item"><p><strong>Karma Gained:</strong> {{ results.karma_points_awarded }} points</p></div>
+                {% endif %}
+                {% if results.user_current_karma and results.user_current_karma not in ["User not found or karma not updated", "Error during karma update", "N/A"] %}
+                <div class="result-item"><p><strong>Your New Karma Total:</strong> {{ results.user_current_karma }}</p></div>
+                {% endif %}
+            </div>
+
+            {# --- Next Quest --- #}
+            {% if results.next_quest_id %}
+            <div class="result-section" style="background-color: #e9f5ff; padding: 15px; border-radius: 4px;">
+                <h2>Next Quest Generated!</h2>
+                <p>A new quest (ID: {{ results.next_quest_id }}) for '{{ results.next_quest_category }}' has been assigned to {{ results.next_quest_for_user if results.next_quest_for_user != results.user_id else 'you' }}.</p>
+            </div>
+            {% elif results.new_quest_id %} {# For expired quest regeneration message #}
+             <div class="result-section" style="background-color: #fffacd; padding: 15px; border-radius: 4px;">
+                <h2>New Quest Info</h2>
+                <p>{{ results.message }}</p>
+                <p>New Quest ID: {{ results.new_quest_id }}</p>
+                <p>Category: {{ results.new_quest_category }}</p>
+            </div>
+            {% endif %}
+
+        {% else %}
+            <p class="message-box info">No results to display. You might have accessed this page directly or the previous action didn't complete as expected.</p>
+        {% endif %}
+
+        <div class="button-container">
+            <a href="{{ url_for('quests') }}" class="button-primary">Back to My Quests</a>
+        </div>
+
+    </div>
+    {# Navbar and slide overlay script removed as per instruction #}
+</body>
+</html>
