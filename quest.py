@@ -204,7 +204,7 @@ class Quest:
             "creation_time": now_utc,  # Stored in DB for expiry logic
             "expiry_time": end_time_utc,  # Stored in DB for expiry logic
             "status": "pending",
-            "user_from_id": None,
+            "user_from_id": "682975d597fb90e0ad097cbf",
             "nominated_by_image_uri": None,
             "completion_image_uri": None,
             "points_awarded": None  # Points handled externally
