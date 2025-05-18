@@ -23,6 +23,57 @@
             transform: translateX(0);
             pointer-events: auto;
         }
+        .questbox .button {
+        padding: 15px 0 !important; /* Makes the green button a bit higher */
+        font-size: 1.3rem;
+        margin-top: 20px !important;
+        
+}
+        .questbox {
+        text-align: center;
+        font-size:3rem;
+    }
+        .questbox .button {
+            font-size: 2.2rem;
+        }
+        .questbox .largertext,
+        .questbox .time-remaining,
+        .questbox h4 {
+        margin-top: 4px;
+        margin-bottom: 4px;
+        text-align: center;
+        display: block;
+}
+.questbox-header {
+    display: flex;
+    align-items: flex-start; /* Align image and text to the top */
+    justify-content: flex-start;
+    margin-bottom: 8px;
+}
+
+.questbox .rtow-img {
+    width: 133px;           
+    height: 133px;          
+    object-fit: cover;      
+    border-radius: 12px;    
+    display: block;
+    margin: 0 auto 8px auto; 
+}
+.questbox hr {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.questbox-header-text h2 {
+    font-size: 2.7rem;
+    margin: 0;
+    text-align: left;
+}
+.questbox-header-text h3 {
+    font-size: 1.2rem;
+    margin: 0;
+    text-align: left;
+}
     </style>
 </head>
 <body>
@@ -40,10 +91,15 @@
                         <img src="{{ url_for('static', filename='default_quest_image.png') }}" alt="Default quest image" class="rtow-img"/> {# Fallback image #}
                     {% endif %}
                 {% else %}
-                    <h2>System Quest</h2>
-                    <h3 class="username">A new challenge awaits!</h3>
-                     {# You can put a generic system quest image here if desired #}
-                {% endif %}
+    <div class="questbox-header">
+        <img src="{{ url_for('static', filename='rtow.jpg') }}" alt="Default quest image" class="rtow-img"/>
+        <div class="questbox-header-text">
+            <h2>Quest!</h2>
+            <h3 class="username" style="font-size:1.8rem;">Sent by </h3>
+            <h3 class="username"> Roara</h3>    
+        </div>
+    </div>
+{% endif %}
 
                 <p class="largertext" style="margin-bottom: 0px;">Time remaining:</p>
                 {# This will display the expiry time. JavaScript below will make it a countdown. #}
@@ -68,10 +124,10 @@
 
     <div class="navbar">
     <ul>
-        <li><a href="quests" class="button"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
-        <li><a href="friends" class="button"><img src="../static/duooo.png" alt="leaderboard"></a></li>
-        <li><a href="capture" class="button largebutton"><img src="../static/BLACKADD.png" alt="capture"></a></li>
-        <li><a href="profile" class="button"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
+        <li><a href="friends" class="button"><img src="../static/BLUEHEART.png" alt="leaderboard"></a></li>
+        <li><a href="quests" class="button"><img src="../static/BLUE.png" alt="quests"></a></li>
+        
+        <li><a href="profile" class="button"><img src="../static/BLUEPERSON.png" alt="profile"></a></li>
     </ul>
 </div>
 
