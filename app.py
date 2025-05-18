@@ -47,10 +47,14 @@ def login():
             return jsonify({"error": "user_id is required"}), 400
 
         user_id = data["user_id"]
+        new_user = data["new_user"]
 
-        response = make_response(redirect('/'))
+        if not new_user:
+            response = make_response(redirect('/'))
+        else:
+            response = make_response(redirect('/onboarding_pg0'))
+
         response.set_cookie('user_session', user_id)
-
         return response
 
     return render_template('login.html')
@@ -107,16 +111,53 @@ def capture():
     return render_template("capture.html")
 
 
+@app.route("/onboarding_pg0")
+def onboarding_pg0():
+    return render_template("onboarding_pg0.html")
+
+
+@app.route('/onboarding_pg1', methods=['GET', 'POST'])
+def onboarding_pg1():
+    if request.method == 'POST':
+        data = request.json
+        if not data or "user_id" not in data:
+            return jsonify({"error": "user_id is required"}), 400
+
+        friend_id = data["user_id"]
+        current_user = ObjectId(get_user_session())
+        friend_user = ObjectId(friend_id)
+
+        response = make_response(redirect('/onboarding_pg2'))
+        users_collection.update_one(
+            {"_id": current_user},
+            {"$addToSet": {"friends": friend_user}}
+        )
+        users_collection.update_one(
+            {"_id": friend_user},
+            {"$addToSet": {"friends": current_user}}
+        )
+
+        return response
+
+    return render_template('onboarding_pg1.html')
+
+
+@app.route("/onboarding_pg2")
+def onboarding_pg2():
+    return render_template("onboarding_pg2.html")
+
+
 @app.route('/friends')
 def friends():
     try:
         print(get_user_session())
         current_user = User.get_user_by_id(users_collection, get_user_session())
         all_users_from_db = current_user.friends + [ObjectId(get_user_session())]
-        print([User.get_user_by_id(users_collection, user_objectid) for user_objectid in all_users_from_db])
+        real_users_from_db = [user for user in all_users_from_db if user is not None]
+        print([User.get_user_by_id(users_collection, user_objectid) for user_objectid in real_users_from_db])
         # Sort users by karma in descending order
         # The User objects themselves will be sorted
-        sorted_leaderboard_users = sorted(all_users_from_db, key=lambda u: User.get_user_by_id(users_collection, u).karma, reverse=True)
+        sorted_leaderboard_users = sorted(real_users_from_db, key=lambda u: User.get_user_by_id(users_collection, u).karma, reverse=True)
         sorted_leaderboard_users = [User.get_user_by_id(users_collection, user_objectid) for user_objectid in sorted_leaderboard_users]
         print(sorted_leaderboard_users[0].name)
         return render_template('friends.html', leaderboard_users=sorted_leaderboard_users)
