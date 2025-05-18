@@ -106,27 +106,20 @@ def quests():
     if not user_session_id:
         return redirect('/login')  # Redirect to login if no session
 
-    try:
-        # Fetch pending quests for the current user.
-        # The Quest.get_quests_for_user method expects the user_to_id as a string.
-        # The user_session_id from the cookie is already a string (ObjectId converted to string).
-        user_active_quests = Quest.get_quests_for_user(quests_collection, user_session_id, status="pending")
+    # Fetch pending quests for the current user.
+    # The Quest.get_quests_for_user method expects the user_to_id as a string.
+    # The user_session_id from the cookie is already a string (ObjectId converted to string).
+    user_active_quests = Quest.get_quests_for_user(quests_collection, user_session_id, status="pending")
 
-        # You might want to fetch user's name to display on the page too
-        current_user = User.get_user_by_id(users_collection, ObjectId(user_session_id))
-        user_name = current_user.name if current_user else "User"
+    # You might want to fetch user's name to display on the page too
+    current_user = User.get_user_by_id(users_collection, ObjectId(user_session_id))
+    user_name = current_user.name if current_user else "User"
 
-        print(f"Fetched {len(user_active_quests)} pending quests for user {user_session_id}")
-
-        return render_template("quests.html",
-                               user_quests=user_active_quests,
-                               user_name=user_name)
-    except Exception as e:
-        print(f"Error fetching quests for user {user_session_id}: {e}")
-        import traceback
-        traceback.print_exc()
-        # Render the quests page with an error or empty list
-        return render_template("quests.html", user_quests=[], user_name="User", error_message="Could not load quests.")
+    print(f"Fetched {len(user_active_quests)} pending quests for user {user_session_id}")
+    print(user_active_quests)
+    return render_template("quests.html",
+                           user_quests=user_active_quests,
+                           user_name=user_name)
 
 
 @app.route("/capture")

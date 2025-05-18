@@ -6,107 +6,6 @@
     <title>Karma | Quests</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
     <style>
-        /* Base styles from your provided HTML */
-        /* You can move these to styles.css if they are shared */
-        h1 { /* Assuming h1 style is in styles.css or defined globally */
-            text-align: center;
-            margin-top: 20px;
-            margin-bottom: 20px;
-            color: #333; /* Example color */
-        }
-        .questbox {
-            width: 90%;
-            max-width: 400px; /* Adjusted for a single quest display */
-            margin: 20px auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            background-color: #fff;
-            text-align: center;
-        }
-        .questbox h2 {
-            font-size: 1.4em;
-            color: #007bff;
-            margin-top: 0;
-            margin-bottom: 10px;
-        }
-        .questbox .username { /* Class for "By Username" */
-            font-size: 0.9em;
-            color: #555;
-            margin-top: 0;
-            margin-bottom: 15px;
-        }
-        .questbox .rtow-img { /* Class for the nomination image */
-            width: 100%;
-            max-width: 300px;
-            height: auto;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            object-fit: cover; /* Ensures image covers the area well */
-        }
-        .questbox .largertext {
-            font-size: 1.1em;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 0px;
-        }
-        .questbox h4 { /* For time remaining and theme value */
-            font-size: 1.2em;
-            color: #28a745; /* Example color for emphasis */
-            margin-top: 5px;
-            margin-bottom: 15px;
-        }
-        .questbox hr {
-            border: 0;
-            height: 1px;
-            background: #eee;
-            margin: 20px 0;
-        }
-        .no-quests {
-            text-align: center;
-            font-size: 1.1em;
-            color: #777;
-            margin-top: 50px;
-        }
-
-        /* Navbar styles from your previous example */
-        .navbar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: #fff;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-            padding: 10px 0;
-            z-index: 1000;
-        }
-        .navbar ul {
-            list-style: none;
-            display: flex;
-            justify-content: space-around;
-            margin: 0;
-            padding: 0;
-        }
-        .navbar ul li a.button {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-decoration: none;
-            color: #333;
-            padding: 5px;
-        }
-        .navbar ul li a.button img {
-            width: 30px;
-            height: 30px;
-            margin-bottom: 3px;
-        }
-         .navbar ul li a.largebutton img {
-            width: 45px;
-            height: 45px;
-        }
-
-        /* Slide overlay styles from your previous example */
         #slide-overlay {
             position: fixed;
             top: 0;
@@ -119,6 +18,7 @@
             transition: transform 0.5s cubic-bezier(.77, 0, .18, 1);
             pointer-events: none;
         }
+
         #slide-overlay.active {
             transform: translateX(0);
             pointer-events: auto;
@@ -167,13 +67,13 @@
     {% endif %}
 
     <div class="navbar">
-        <ul>
-            <li><a href="{{ url_for('quests') }}" class="button nav-link"><img src="{{ url_for('static', filename='QUESTSBLACK.png') }}" alt="quests"></a></li>
-            <li><a href="{{ url_for('friends_leaderboard') }}" class="button nav-link"><img src="{{ url_for('static', filename='duooo.png') }}" alt="leaderboard"></a></li>
-            <li><a href="{{ url_for('capture') }}" class="button largebutton nav-link"><img src="{{ url_for('static', filename='BLACKADD.png') }}" alt="capture"></a></li>
-            <li><a href="{{ url_for('profile') if 'profile' in_endpoints else '#' }}" class="button nav-link"><img src="{{ url_for('static', filename='PROFILEBLACK.png') }}" alt="profile"></a></li>
-        </ul>
-    </div>
+    <ul>
+        <li><a href="quests" class="button"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
+        <li><a href="friends" class="button"><img src="../static/duooo.png" alt="leaderboard"></a></li>
+        <li><a href="capture" class="button largebutton"><img src="../static/BLACKADD.png" alt="capture"></a></li>
+        <li><a href="profile" class="button"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
+    </ul>
+</div>
 
     <div id="slide-overlay"></div>
 
