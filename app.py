@@ -1,16 +1,21 @@
 import certifi
+import io
+import json
 import os
 import random
 
-from flask import Flask, request, jsonify, redirect, make_response, render_template, session, url_for
+from flask import Flask, request, jsonify, redirect, make_response, render_template, session, url_for, send_file
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import re
 from bson.objectid import ObjectId
+import mimetypes # For guessing MIME type
 
 from web_scraper import Scraper  # Assuming web_scraper.py is in the same directory
-
+from google.cloud import storage as gcs_storage
+from google.oauth2 import service_account as gcs_service_account # For credentials from JSON string
+import google.auth.exceptions as gcs_auth_exceptions
 from image_recognizer import get_image_labels_and_entities
 from gcs_uploader import upload_image_stream_to_gcs_for_user, \
     ALLOWED_IMAGE_EXTENSIONS  # Keep allowed_file defined locally or import it too
@@ -34,6 +39,35 @@ users_collection = db["users"]
 quests_collection = db["quests"]
 photos_collection = db["photos"]
 
+# --- GCS Client for Image Serving ---
+gcs_client_for_serving = None
+print(gcs_storage, gcs_service_account)
+if gcs_storage and gcs_service_account:
+    google_app_creds_json_string = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
+    creds_info = json.loads(google_app_creds_json_string)
+
+    # Load credentials from the parsed dictionary
+    credentials = gcs_service_account.Credentials.from_service_account_info(
+        creds_info,
+        scopes=['https://www.googleapis.com/auth/devstorage.read_write']
+
+    )
+    project_id_from_creds = credentials.project_id  # Should be available from creds_info or inferred
+
+    # Manually setting universe_domain if needed.
+    # With from_service_account_info, it should pick up 'universe_domain' if present in creds_info.
+    if not hasattr(credentials, 'universe_domain') or not credentials.universe_domain:
+        # Check if it's in the loaded info and try to set it
+        if 'universe_domain' in creds_info:
+            credentials.universe_domain = creds_info['universe_domain']
+        else:  # Default if not in JSON and not on object
+            # print("Attempting to manually set universe_domain on credentials object as a fallback.") # Debugging
+            credentials.universe_domain = "googleapis.com"
+        gcs_client_for_serving = gcs_storage.Client(credentials=credentials, project=creds_info.get("project_id"))
+
+
+# --- End GCS Client Init ---
 
 def get_user_session():
     return request.cookies.get('user_session')
@@ -405,7 +439,9 @@ def get_dynamsoft_license():
 
 @app.route('/upload_endpoint', methods=['POST'])
 def upload_endpoint():
-    if 'image_file' not in request.files: return jsonify({"error": "No image file part in the request."}), 400
+    if 'image_file' not in request.files:
+        session['upload_results'] = {"error": "No image file part in the request.", "status_code": 400}
+        return redirect(url_for('results'))
 
     file = request.files['image_file']
     uploader_user_id_str = get_user_session()
@@ -413,42 +449,53 @@ def upload_endpoint():
 
     if not uploader_user_id_str:
         session['upload_results'] = {"error": "User not authenticated (no session).", "status_code": 401}
-        return redirect('/results')
+        return redirect(url_for('results'))
     if not quest_id_str_being_completed:
         session['upload_results'] = {"error": "Quest ID (quest_id_str) is required in form data for completion.",
                                      "status_code": 400}
-        return redirect('/results')
+        return redirect(url_for('results'))
     if file.filename == '':
         session['upload_results'] = {"error": "No image selected for uploading.", "status_code": 400}
-        return redirect('/results')
+        return redirect(url_for('results'))
 
     if file and allowed_file(file.filename):
         original_filename = secure_filename(file.filename)
         gcs_uri = None
-        session_results = {"original_filename": original_filename,
-                           "quest_completed_id": quest_id_str_being_completed}  # Initialize session_results
+        bucket_name_for_upload = "karma-videos"  # Explicitly define bucket
+        session_results = {
+            "original_filename": original_filename,
+            "quest_completed_id": quest_id_str_being_completed,
+            "status_code": 200
+        }
 
         try:
             uploader_user_obj_id = ObjectId(uploader_user_id_str)
             uploader_user = User.get_user_by_id(users_collection, uploader_user_obj_id)
             if not uploader_user:
-                session['upload_results'] = {"error": "Uploader user not found.", "status_code": 404}
-                return redirect('/results')
+                session_results["error"] = "Uploader user not found."
+                session_results["status_code"] = 404
+                session['upload_results'] = session_results
+                return redirect(url_for('results'))
 
             quest_to_complete = Quest.get_quest_by_quest_id_str(quests_collection, quest_id_str_being_completed)
             if not quest_to_complete:
-                session['upload_results'] = {"error": f"Quest {quest_id_str_being_completed} not found.",
-                                             "status_code": 404}
-                return redirect('/results')
+                session_results["error"] = f"Quest {quest_id_str_being_completed} not found."
+                session_results["status_code"] = 404
+                session['upload_results'] = session_results
+                return redirect(url_for('results'))
+
             if quest_to_complete.user_to_id != uploader_user_id_str:
-                session['upload_results'] = {"error": "This quest does not belong to the current user.",
-                                             "status_code": 403}
-                return redirect('/results')
+                session_results["error"] = "This quest does not belong to the current user."
+                session_results["status_code"] = 403
+                session['upload_results'] = session_results
+                return redirect(url_for('results'))
+
             if quest_to_complete.status != "pending":
-                session['upload_results'] = {
-                    "error": f"Quest {quest_id_str_being_completed} is not pending (current status: {quest_to_complete.status}).",
-                    "status_code": 400}
-                return redirect('/results')
+                session_results[
+                    "error"] = f"Quest {quest_id_str_being_completed} is not pending (current status: {quest_to_complete.status})."
+                session_results["status_code"] = 400
+                session['upload_results'] = session_results
+                return redirect(url_for('results'))
 
             if quest_to_complete.is_expired():
                 print(f"Quest {quest_id_str_being_completed} is expired. Handling expiry...")
@@ -463,24 +510,35 @@ def upload_endpoint():
                     session_results["message"] = "Previous quest was expired. A new quest has been generated."
                     session_results["new_quest_id"] = next_quest_data["quest_id_str"]
                     session_results["new_quest_category"] = next_quest_data["target_category"]
+                    # Add display_image_url for the new quest if it has a nominated_by_image_uri
+                    if next_quest_data.get("nominated_by_image_uri"):
+                        nom_bucket, nom_object = next_quest_data["nominated_by_image_uri"].replace("gs://", "").split(
+                            "/", 1)
+                        session_results["new_quest_display_image_url"] = url_for('serve_gcs_image',
+                                                                                 bucket_name=nom_bucket,
+                                                                                 object_path=nom_object)
+
                 else:
                     session_results["message"] = "Previous quest was expired but new quest generation failed."
                 session['upload_results'] = session_results
-                return redirect('/results')
+                return redirect(url_for('results'))
 
-            gcs_uri = upload_image_stream_to_gcs_for_user(
-                file_stream=file,
-                original_filename=original_filename,
-                user_id_folder=uploader_user_id_str,
-                bucket_name="karma-videos",  # Explicitly set
-                content_type=file.content_type
-            )
+            gcs_uri = upload_image_stream_to_gcs_for_user(file, original_filename, uploader_user_id_str,
+                                                          bucket_name=bucket_name_for_upload,
+                                                          content_type=file.content_type)
             if not gcs_uri:
-                session['upload_results'] = {"error": "Image upload to GCS failed.", "gcs_uri": None,
-                                             "status_code": 500}
-                return redirect('/results')
+                session_results["error"] = "Image upload to GCS failed."
+                session_results["gcs_uri"] = None
+                session_results["status_code"] = 500
+                session['upload_results'] = session_results
+                return redirect(url_for('results'))
+
             print(f"Image uploaded to GCS: {gcs_uri}")
             session_results["gcs_uri"] = gcs_uri
+            # Generate display URL for the results page
+            gcs_bucket_part, gcs_object_part = gcs_uri.replace("gs://", "").split("/", 1)
+            session_results["display_image_url"] = url_for('serve_gcs_image', bucket_name=gcs_bucket_part,
+                                                           object_path=gcs_object_part)
 
             image_labels_dict = get_image_labels_and_entities(gcs_uri)
             if not image_labels_dict or "error" in image_labels_dict:
@@ -489,7 +547,7 @@ def upload_endpoint():
                 session_results["error"] = error_msg
                 session_results["status_code"] = 500
                 session['upload_results'] = session_results
-                return redirect('/results')
+                return redirect(url_for('results'))
             formatted_labels = [f"{desc.capitalize()} (Score: {score:.2f})" for desc, score in
                                 image_labels_dict.items()]
             session_results["image_labels"] = formatted_labels
@@ -506,34 +564,26 @@ def upload_endpoint():
             session_results["karma_points_awarded"] = karma_points_awarded
 
             if karma_points_awarded > 0:
-                # Use Quest object's method to handle completion and get data for next quest
-                # The handle_completion_and_nominate method in Quest class now saves the completed quest
-                # and then deletes it, returning data for the next quest.
                 next_quest_data = quest_to_complete.handle_completion_and_nominate(
                     completion_image_uri=gcs_uri,
                     user_friends_list=[str(f) for f in uploader_user.friends],
                     quests_collection=quests_collection,
+                    users_collection=users_collection
                 )
 
                 users_collection.update_one(
                     {"_id": uploader_user_obj_id},
                     {"$inc": {"karma": karma_points_awarded}}
-                    # $push photos is now handled by Photo class if used, or directly if not
                 )
-                # Save the Photo object
                 try:
-                    if 'Photo' in globals() and quest_to_complete.mongo_id:  # Check if Photo class is available
+                    if 'Photo' in globals() and quest_to_complete.mongo_id:
                         new_photo = Photo(user_id=uploader_user_obj_id, quest_id=quest_to_complete.mongo_id,
                                           url=gcs_uri)
                         new_photo.save_to_db(photos_collection)
-                        users_collection.update_one({"_id": uploader_user_obj_id},
-                                                    {"$push": {"photos": new_photo._id}})  # Store Photo ObjectId
+                        users_collection.update_one({"_id": uploader_user_obj_id}, {"$push": {"photos": new_photo._id}})
                         print(f"Photo object saved with ID: {new_photo._id}")
-                    else:  # Fallback to just storing GCS URI if Photo class isn't used/available
+                    else:
                         users_collection.update_one({"_id": uploader_user_obj_id}, {"$push": {"photos": gcs_uri}})
-                        print(
-                            "Photo class not available or quest mongo_id missing, storing GCS URI directly in user photos.")
-
                 except Exception as e_photo:
                     print(f"Error saving Photo object or updating user photos: {e_photo}")
 
@@ -554,6 +604,14 @@ def upload_endpoint():
                     session_results["next_quest_id"] = new_quest_id_str
                     session_results["next_quest_for_user"] = recipient_user_id_str
                     session_results["next_quest_category"] = next_quest_data["target_category"]
+                    # Add display URL for nominated quest image if available
+                    if next_quest_data.get("nominated_by_image_uri"):
+                        nom_bucket_next, nom_object_next = next_quest_data["nominated_by_image_uri"].replace("gs://",
+                                                                                                             "").split(
+                            "/", 1)
+                        session_results["next_quest_nomination_image_url"] = url_for('serve_gcs_image',
+                                                                                     bucket_name=nom_bucket_next,
+                                                                                     object_path=nom_object_next)
                     print(f"New quest {new_quest_id_str} created for user {recipient_user_id_str}.")
                 else:
                     print(f"No next quest data generated after completing {quest_id_str_being_completed}.")
@@ -563,21 +621,57 @@ def upload_endpoint():
                     "completion_message"] = "Deed submitted, but no karma points awarded. Quest not marked as completed."
 
             session['upload_results'] = session_results
-            return redirect('/results')
+            return redirect(url_for('results'))
 
         except RuntimeError as e:
             session['upload_results'] = {"error": f"Server config error: {e}", "status_code": 500}
-            return redirect('/results')
+            return redirect(url_for('results'))
         except Exception as e:
             import traceback;
             traceback.print_exc()
             session['upload_results'] = {"error": f"Unexpected error: {str(e)}", "status_code": 500}
-            return redirect('/results')
+            return redirect(url_for('results'))
     else:
         session['upload_results'] = {"error": f"Invalid file type. Allowed: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}",
                                      "status_code": 400}
-        return redirect('/results')
+        return redirect(url_for('results'))
 
+
+@app.route('/gcs-image/<bucket_name>/<path:object_path>')
+def serve_gcs_image(bucket_name: str, object_path: str):
+    if not gcs_client_for_serving:
+        return "GCS client for serving images not initialized.", 500
+    try:
+        bucket = gcs_client_for_serving.bucket(bucket_name)
+        blob = bucket.blob(object_path)
+
+        if not blob.exists():
+            return "Image not found in GCS.", 404
+
+        image_bytes = blob.download_as_bytes()
+
+        # Guess MIME type
+        mime_type, _ = mimetypes.guess_type(object_path)
+        if not mime_type:  # Default if guess fails
+            if object_path.lower().endswith(('.jpg', '.jpeg')):
+                mime_type = 'image/jpeg'
+            elif object_path.lower().endswith('.png'):
+                mime_type = 'image/png'
+            elif object_path.lower().endswith('.gif'):
+                mime_type = 'image/gif'
+            else:
+                mime_type = 'application/octet-stream'  # Fallback
+
+        return send_file(io.BytesIO(image_bytes), mimetype=mime_type)
+
+    except gcs_auth_exceptions.DefaultCredentialsError as e_auth:
+        print(f"GCS Auth Error serving image: {e_auth}")
+        return "Authentication error with GCS.", 500
+    except Exception as e:
+        print(f"Error serving GCS image gs://{bucket_name}/{object_path}: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error serving image.", 500
 
 
 @app.route('/results')

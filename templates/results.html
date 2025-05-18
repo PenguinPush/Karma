@@ -9,8 +9,7 @@
         /* Minimal additional styling for structure and appeal */
         /* You can integrate these into your universal styles.css */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background-color: #f4f7f6;
@@ -23,6 +22,7 @@
             background-color: #fff;
             border-radius: 12px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            text-align: left; /* Default text alignment */
         }
         h1 {
             text-align: center;
@@ -62,6 +62,9 @@
             background-color: #d1ecf1;
             border-color: #bee5eb;
         }
+        .result-section {
+            margin-bottom: 20px;
+        }
         .result-item {
             margin-bottom: 12px;
             padding: 8px 0;
@@ -71,32 +74,40 @@
             display: inline-block;
             min-width: 180px; /* For alignment */
         }
+        .result-item p, .result-item ul {
+            margin: 5px 0;
+            line-height: 1.6;
+        }
         .result-photo-container {
             text-align: center;
             margin-bottom: 20px;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 8px;
         }
         .result-photo {
             max-width: 100%;
-            max-height: 400px; /* Limit image height */
+            max-height: 400px;
             height: auto;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-radius: 5px;
+            /* box-shadow: 0 2px 4px rgba(0,0,0,0.05); Removed to avoid double shadow */
         }
         .labels-list {
             list-style: none;
             padding-left: 0;
+            display: flex; /* For inline-block behavior */
+            flex-wrap: wrap; /* Allow labels to wrap */
         }
         .labels-list li {
             background-color: #ecf0f1;
-            padding: 5px 10px;
-            border-radius: 4px;
-            margin-bottom: 5px;
+            color: #34495e;
+            padding: 6px 12px;
+            border-radius: 15px; /* Pill shape */
+            margin-bottom: 8px;
             font-size: 0.9em;
-            display: inline-block; /* Make labels flow nicely */
-            margin-right: 5px;
+            margin-right: 8px;
         }
-        .button-container { /* For the "Back to Quests" button */
+        .button-container {
             text-align: center;
             margin-top: 30px;
         }
@@ -115,6 +126,10 @@
         .button-primary:hover {
             background-color: #2980b9;
         }
+        small {
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
     </style>
 </head>
 <body>
@@ -125,15 +140,15 @@
             {# Display Success/Failure Message #}
             {% if results.error %}
                 <div class="message-box error">
-                    <p><strong>Status:</strong> Quest Processing Failed</p>
+                    <p><strong>Status:</strong> Failed</p>
                     <p>{{ results.error }}</p>
                     {% if results.gcs_uri %}
-                        <p><small>Image was uploaded to: {{ results.gcs_uri }} but processing failed.</small></p>
+                        <p><small>Image GCS URI: {{ results.gcs_uri }}</small></p>
                     {% endif %}
                 </div>
             {% elif results.completion_message %}
                 <div class="message-box success">
-                    <p><strong>Status:</strong> {{ "Quest Completed Successfully!" if results.karma_points_awarded > 0 else "Image Processed" }}</p>
+                    <p><strong>Status:</strong> {{ "Success!" if results.karma_points_awarded is not none and results.karma_points_awarded > 0 else "Processed" }}</p>
                     <p>{{ results.completion_message | safe }}</p>
                 </div>
             {% else %}
@@ -142,21 +157,19 @@
                  </div>
             {% endif %}
 
-            {# Display Photo Taken #}
-            {% if results.gcs_uri %}
+            {# Display Photo Taken via the new endpoint #}
+            {% if results.display_image_url %}
                 <div class="result-photo-container">
                     <h2>Submitted Photo</h2>
-                    {# IMPORTANT: For this to work, results.gcs_uri must be a publicly accessible HTTPS URL.
-                         If it's a gs:// URI, you'll need a backend endpoint to serve the image.
-                         Alternatively, if your GCS bucket objects are public, you can construct
-                         the public URL: https://storage.googleapis.com/YOUR_BUCKET_NAME/OBJECT_PATH #}
-                    <img src="{{ results.gcs_uri }}" alt="Uploaded Quest Photo" class="result-photo"
-                         onerror="this.alt='Image preview not available. Ensure GCS URI is a public HTTPS URL or served via your app.'; this.style.display='none';">
-                    <p><small>GCS URI: {{ results.gcs_uri }}</small></p>
+                    <img src="{{ results.display_image_url }}" alt="Uploaded Quest Photo" class="result-photo">
+                </div>
+            {% elif results.gcs_uri %}
+                 <div class="result-item">
+                    <p><strong>Photo GCS URI:</strong> {{ results.gcs_uri }}</p>
+                    <p><small>(Image preview not available directly from GCS URI in browser. Ensure 'display_image_url' is generated by the server.)</small></p>
                 </div>
             {% endif %}
 
-            {# --- Image & Analysis Details --- #}
             <div class="result-section">
                 <h2>Image & Analysis Details</h2>
                 {% if results.original_filename %}
@@ -183,7 +196,6 @@
                 {% endif %}
             </div>
 
-            {# --- Quest & Karma --- #}
             <div class="result-section">
                 <h2>Quest & Karma</h2>
                 {% if results.quest_completed_id %}
@@ -197,18 +209,28 @@
                 {% endif %}
             </div>
 
-            {# --- Next Quest --- #}
             {% if results.next_quest_id %}
             <div class="result-section" style="background-color: #e9f5ff; padding: 15px; border-radius: 4px;">
                 <h2>Next Quest Generated!</h2>
-                <p>A new quest (ID: {{ results.next_quest_id }}) for '{{ results.next_quest_category }}' has been assigned to {{ results.next_quest_for_user if results.next_quest_for_user != results.user_id else 'you' }}.</p>
+                <p>A new quest (ID: {{ results.next_quest_id }}) for '{{ results.next_quest_category }}' has been assigned to
+                   {% set recipient_user_id = results.user_id if results.next_quest_for_user == results.user_id else results.next_quest_for_user %}
+                   {{ 'you' if results.next_quest_for_user == results.user_id else ('user ' + recipient_user_id) }}.
+                </p>
+                {% if results.next_quest_nomination_image_url %}
+                    <p>Inspired by:</p>
+                    <img src="{{ results.next_quest_nomination_image_url }}" alt="Nomination inspiration image" style="max-width: 200px; height: auto; border-radius: 4px;">
+                {% endif %}
             </div>
-            {% elif results.new_quest_id %} {# For expired quest regeneration message #}
+            {% elif results.new_quest_id %}
              <div class="result-section" style="background-color: #fffacd; padding: 15px; border-radius: 4px;">
                 <h2>New Quest Info</h2>
                 <p>{{ results.message }}</p>
                 <p>New Quest ID: {{ results.new_quest_id }}</p>
                 <p>Category: {{ results.new_quest_category }}</p>
+                 {% if results.new_quest_display_image_url %}
+                    <p>Inspired by:</p>
+                    <img src="{{ results.new_quest_display_image_url }}" alt="Nomination inspiration image for new quest" style="max-width: 200px; height: auto; border-radius: 4px;">
+                {% endif %}
             </div>
             {% endif %}
 
@@ -219,8 +241,6 @@
         <div class="button-container">
             <a href="{{ url_for('quests') }}" class="button-primary">Back to My Quests</a>
         </div>
-
     </div>
-    {# Navbar and slide overlay script removed as per instruction #}
 </body>
 </html>
