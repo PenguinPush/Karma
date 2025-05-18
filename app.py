@@ -112,7 +112,7 @@ def friends():
     try:
         print(get_user_session())
         current_user = User.get_user_by_id(users_collection, get_user_session())
-        all_users_from_db = current_user.friends
+        all_users_from_db = current_user.friends + [ObjectId(get_user_session())]
         print([User.get_user_by_id(users_collection, user_objectid) for user_objectid in all_users_from_db])
         # Sort users by karma in descending order
         # The User objects themselves will be sorted
