@@ -141,7 +141,7 @@ def index():
 def quests():
     user_session_id_str = get_user_session()
     if not user_session_id_str:
-        return redirect('/login')
+        return redirect(url_for('login'))  # Use url_for
 
     try:
         user_object_id = ObjectId(user_session_id_str)
@@ -150,30 +150,26 @@ def quests():
 
         if not current_user:
             print(f"User {user_session_id_str} not found in DB. Redirecting to login.")
-            return redirect('/login')
+            return redirect(url_for('login'))
 
-        # --- Handle existing expired pending quests for the user ---
         print(f"Checking for existing pending quests for user {user_session_id_str}...")
-        # Fetch as a list to iterate and potentially modify the collection during iteration
         pending_quests_docs = list(quests_collection.find({"user_to_id": user_session_id_str, "status": "pending"}))
+
+        quests_for_template = []  # This will hold quest data dictionaries for the template
 
         for quest_doc in pending_quests_docs:
             quest_obj = Quest.from_mongo(quest_doc)
-            if quest_obj.is_expired():  # is_expired() should use quest_doc's expiry_time
+            if quest_obj.is_expired():
                 print(f"Found expired pending quest: {quest_obj.quest_id_str} for user {user_session_id_str}")
-                # handle_expiry_and_regenerate_data deletes the old quest and returns data for a new one.
                 new_system_quest_data = quest_obj.handle_expiry_and_regenerate_data(
                     quests_collection,
                     POSSIBLE_QUEST_CATEGORIES
                 )
                 if new_system_quest_data:
-                    # Save the new system quest that replaces the expired one
                     quests_collection.insert_one(new_system_quest_data)
                     new_regenerated_quest_id_str = new_system_quest_data["quest_id_str"]
                     print(
                         f"Replaced expired quest {quest_obj.quest_id_str} with new system quest {new_regenerated_quest_id_str} for user {user_session_id_str}.")
-
-                    # Update user's quest list in DB: remove old, add new
                     users_collection.update_one(
                         {"_id": user_object_id},
                         {"$pull": {"quests": quest_obj.quest_id_str}}
@@ -183,53 +179,76 @@ def quests():
                         {"$push": {"quests": new_regenerated_quest_id_str}}
                     )
                 else:
-                    # This case implies handle_expiry_and_regenerate_data decided not to regenerate
-                    # or failed, which might mean the quest wasn't truly expired or pending from its perspective.
                     print(
-                        f"Quest {quest_obj.quest_id_str} was not regenerated after expiry check (possibly already handled or not expired).")
+                        f"Quest {quest_obj.quest_id_str} was not regenerated after expiry check.")
+                continue  # Skip adding this expired quest to the display list
 
-        # Re-fetch active quests after handling expiries
-        user_active_quests = Quest.get_quests_for_user(quests_collection, user_session_id_str, status="pending")
+            # Prepare quest data for template, including display URL for nomination image
+            quest_display_data = quest_obj.to_mongo()
+            quest_display_data['quest_id_str'] = quest_obj.quest_id_str
+            quest_display_data['expiry_time_iso'] = quest_obj.expiry_time.isoformat() if quest_obj.expiry_time else None
+            quest_display_data['user_from_name'] = "System"  # Default
+            if quest_obj.user_from_id:
+                # Attempt to fetch nominator's name
+                try:
+                    nominator_user = User.get_user_by_id(users_collection, ObjectId(quest_obj.user_from_id))
+                    if nominator_user:
+                        quest_display_data['user_from_name'] = nominator_user.name
+                    else:
+                        quest_display_data['user_from_name'] = "An unknown friend"
+                except Exception:  # Invalid ObjectId or other DB error
+                    quest_display_data['user_from_name'] = "A friend"
+
+            if quest_obj.nominated_by_image_uri and quest_obj.nominated_by_image_uri.startswith("gs://"):
+                try:
+                    bucket_part, object_part = quest_obj.nominated_by_image_uri.replace("gs://", "").split("/", 1)
+                    quest_display_data['display_nomination_image_url'] = url_for('serve_gcs_image',
+                                                                                 bucket_name=bucket_part,
+                                                                                 object_path=object_part)
+                except ValueError:
+                    quest_display_data['display_nomination_image_url'] = None
+            else:
+                quest_display_data['display_nomination_image_url'] = quest_obj.nominated_by_image_uri
+            quests_for_template.append(quest_display_data)
 
         # If no pending quests exist after expiry handling, generate a new one
-        if not user_active_quests:
+        if not quests_for_template:
             print(
                 f"No pending quests for user {user_session_id_str} after expiry check. Generating a new system quest.")
             target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
-            duration_seconds = 24 * 60 * 60  # Default 24 hours
+            duration_seconds = 24 * 60 * 60
 
-            # Use Quest.generate_new_system_quest_data from quest.py
             new_quest_data = Quest.generate_new_system_quest_data(
-                user_to_id=user_session_id_str,  # Pass user_id as string
+                user_to_id=user_session_id_str,
                 target_category=target_category,
                 duration_seconds=duration_seconds
             )
-            # Save the new quest data to the quests_collection
             quests_collection.insert_one(new_quest_data)
             new_quest_id_str = new_quest_data["quest_id_str"]
             print(f"New system quest {new_quest_id_str} generated and saved for user {user_session_id_str}.")
 
-            # Add the quest_id_str to the user's 'quests' list in their document
             users_collection.update_one(
                 {"_id": user_object_id},
                 {"$push": {"quests": new_quest_id_str}}
             )
-            # Fetch this new quest to display it
-            # Quest.from_mongo expects a dict that includes _id if it's from DB.
-            # Here, new_quest_data doesn't have _id yet, but Quest constructor can handle it.
-            newly_generated_quest_object = Quest(
-                user_to_id=new_quest_data["user_to_id"],
-                target_category=new_quest_data["target_category"],
-                expiry_time=new_quest_data["expiry_time"],
-                quest_id_str=new_quest_data["quest_id_str"]
-                # mongo_id will be assigned when/if this object is saved via its own save_to_db
-            )
-            user_active_quests = [newly_generated_quest_object]
 
-        print(f"Displaying {len(user_active_quests)} pending quests for user {user_session_id_str}.")
+            # Prepare this new quest for display
+            new_quest_display_data = {
+                "quest_id_str": new_quest_id_str,
+                "user_to_id": new_quest_data["user_to_id"],
+                "target_category": new_quest_data["target_category"],
+                "expiry_time_iso": new_quest_data["expiry_time"].isoformat(),  # Use isoformat for template
+                "status": new_quest_data["status"],
+                "user_from_id": None,
+                "nominated_by_image_uri": None,
+                "display_nomination_image_url": None,  # No nomination image for system quest
+                "user_from_name": "System"
+            }
+            quests_for_template = [new_quest_display_data]
 
+        print(f"Displaying {len(quests_for_template)} quests for user {user_session_id_str}.")
         return render_template("quests.html",
-                               user_quests=user_active_quests,
+                               user_quests=quests_for_template,
                                user_name=user_name_for_template)
     except Exception as e:
         print(f"Error fetching quests for user {user_session_id_str}: {e}")
@@ -237,7 +256,6 @@ def quests():
         traceback.print_exc()
         return render_template("quests.html", user_quests=[], user_name=get_user_session(),
                                error_message="Could not load quests.")
-
 
 @app.route("/capture")  # Changed to accept quest_id as query parameter
 def capture():
