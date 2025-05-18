@@ -15,7 +15,7 @@ from gcs_uploader import upload_image_stream_to_gcs_for_user, \
     ALLOWED_IMAGE_EXTENSIONS  # Keep allowed_file defined locally or import it too
 from classifier import get_description, classify
 from semantic_search import process_activity_and_get_points
-
+from user import User
 load_dotenv()
 
 app = Flask(__name__)
@@ -88,11 +88,6 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/friends")
-def friends():
-    return render_template("friends.html")
-
-
 @app.route("/profile")
 def profile():
     return render_template("profile.html")
@@ -106,6 +101,27 @@ def quests():
 @app.route("/capture")
 def capture():
     return render_template("capture.html")
+
+
+@app.route('/friends')
+def leaderboard():
+
+    try:
+        print(get_user_session())
+        print(User.get_user_by_id(users_collection, get_user_session()))
+        all_users_from_db = User.get_user_by_id(users_collection, get_user_session()).friends
+        print(all_users_from_db)
+        # Sort users by karma in descending order
+        # The User objects themselves will be sorted
+        sorted_leaderboard_users = sorted(all_users_from_db, key=lambda u: u.karma, reverse=True)
+
+        return render_template('friends.html', leaderboard_users=sorted_leaderboard_users)
+    except Exception as e:
+        print(f"Error fetching leaderboard data: {e}")
+        import traceback
+        traceback.print_exc()
+        # You might want to render an error page or return a JSON error
+        return e, 500
 
 
 @app.route("/url_to_user", methods=["POST"])
@@ -290,6 +306,7 @@ def upload_endpoint():
 @app.route("/upload_photo")
 def upload_photo():
     return render_template("upload_photo.html")
+
 
 
 @app.route('/add_friend', methods=['GET', 'POST'])
