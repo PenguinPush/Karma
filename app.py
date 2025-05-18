@@ -105,16 +105,15 @@ def capture():
 
 
 @app.route('/friends')
-def leaderboard():
-
+def friends():
     try:
         print(get_user_session())
-        print(User.get_user_by_id(users_collection, get_user_session()))
-        all_users_from_db = User.get_user_by_id(users_collection, get_user_session()).friends
+        current_user = User.get_user_by_id(users_collection, get_user_session())
+        all_users_from_db = current_user.friends
         print(all_users_from_db)
         # Sort users by karma in descending order
         # The User objects themselves will be sorted
-        sorted_leaderboard_users = sorted(all_users_from_db, key=lambda u: u.karma, reverse=True)
+        sorted_leaderboard_users = sorted(all_users_from_db, key=lambda u: User.get_user_by_id(users_collection, u).karma, reverse=True)
 
         return render_template('friends.html', leaderboard_users=sorted_leaderboard_users)
     except Exception as e:
