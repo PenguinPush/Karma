@@ -4,8 +4,109 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
     <title>Karma | Quests</title>
-    <link rel="stylesheet" href="../static/styles.css"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
     <style>
+        /* Base styles from your provided HTML */
+        /* You can move these to styles.css if they are shared */
+        h1 { /* Assuming h1 style is in styles.css or defined globally */
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            color: #333; /* Example color */
+        }
+        .questbox {
+            width: 90%;
+            max-width: 400px; /* Adjusted for a single quest display */
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            background-color: #fff;
+            text-align: center;
+        }
+        .questbox h2 {
+            font-size: 1.4em;
+            color: #007bff;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .questbox .username { /* Class for "By Username" */
+            font-size: 0.9em;
+            color: #555;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .questbox .rtow-img { /* Class for the nomination image */
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            object-fit: cover; /* Ensures image covers the area well */
+        }
+        .questbox .largertext {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0px;
+        }
+        .questbox h4 { /* For time remaining and theme value */
+            font-size: 1.2em;
+            color: #28a745; /* Example color for emphasis */
+            margin-top: 5px;
+            margin-bottom: 15px;
+        }
+        .questbox hr {
+            border: 0;
+            height: 1px;
+            background: #eee;
+            margin: 20px 0;
+        }
+        .no-quests {
+            text-align: center;
+            font-size: 1.1em;
+            color: #777;
+            margin-top: 50px;
+        }
+
+        /* Navbar styles from your previous example */
+        .navbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #fff;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+            padding: 10px 0;
+            z-index: 1000;
+        }
+        .navbar ul {
+            list-style: none;
+            display: flex;
+            justify-content: space-around;
+            margin: 0;
+            padding: 0;
+        }
+        .navbar ul li a.button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #333;
+            padding: 5px;
+        }
+        .navbar ul li a.button img {
+            width: 30px;
+            height: 30px;
+            margin-bottom: 3px;
+        }
+         .navbar ul li a.largebutton img {
+            width: 45px;
+            height: 45px;
+        }
+
+        /* Slide overlay styles from your previous example */
         #slide-overlay {
             position: fixed;
             top: 0;
@@ -18,7 +119,6 @@
             transition: transform 0.5s cubic-bezier(.77, 0, .18, 1);
             pointer-events: none;
         }
-
         #slide-overlay.active {
             transform: translateX(0);
             pointer-events: auto;
@@ -26,39 +126,135 @@
     </style>
 </head>
 <body>
-<h1>Quests</h1>
-<div class="questbox">
-    <h2>Nominated</h2>
-    <h3 class="username">By Username</h3>
-    <img src="../static/rtow.jpg" alt="rtow image" class="rtow-img"/>
-    <p class="largertext" style="margin-bottom: 0px;">Time remaining:</p>
-    <h4 style="margin-top: 5px;">2d 5h 30min</h4>
-    <hr>
-    <p class="largertext" style="margin-bottom: 0px;">Theme (2x points)</p>
-    <h4 style="margin-top: 5px;">Garbage</h4>
-</div>
-<div class="navbar">
-    <ul>
-        <li><a href="quests" class="button nav-link"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
-        <li><a href="friends" class="button nav-link"><img src="../static/duooo.png" alt="leaderboard"></a></li>
-        <li><a href="capture" class="button largebutton nav-link"><img src="../static/BLACKADD.png" alt="capture"></a>
-        </li>
-        <li><a href="profile" class="button nav-link"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
-    </ul>
-</div>
-<div id="slide-overlay"></div>
+    <h1>{{ user_name }}'s Quests</h1>
+
+    {% if user_quests and user_quests|length > 0 %}
+        {% for quest in user_quests %}
+            <div class="questbox" id="quest-{{ quest.quest_id_str }}">
+                {% if quest.user_from_id %}
+                    <h2>Nominated Quest</h2>
+                    <h3 class="username">By: {{ quest.user_from_id }}</h3> {# Consider fetching actual username in Flask #}
+                    {% if quest.nominated_by_image_uri %}
+                        <img src="{{ quest.nominated_by_image_uri }}" alt="Nomination image" class="rtow-img"/>
+                    {% else %}
+                        <img src="{{ url_for('static', filename='default_quest_image.png') }}" alt="Default quest image" class="rtow-img"/> {# Fallback image #}
+                    {% endif %}
+                {% else %}
+                    <h2>System Quest</h2>
+                    <h3 class="username">A new challenge awaits!</h3>
+                     {# You can put a generic system quest image here if desired #}
+                {% endif %}
+
+                <p class="largertext" style="margin-bottom: 0px;">Time remaining:</p>
+                {# This will display the expiry time. JavaScript below will make it a countdown. #}
+                <h4 style="margin-top: 5px;" class="time-remaining" data-expiry="{{ quest.expiry_time.isoformat() if quest.expiry_time else '' }}">
+                    Calculating...
+                </h4>
+                <hr>
+                <p class="largertext" style="margin-bottom: 0px;">Theme (2x points):</p>
+                <h4 style="margin-top: 5px;">{{ quest.target_category }}</h4>
+
+                {# Add a button or link to complete the quest #}
+                {# This would typically link to your /capture route or a specific quest completion page #}
+                <a href="{{ url_for('capture', quest_id=quest.quest_id_str) }}" class="button" style="display: block; margin-top: 20px; padding: 10px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">Complete Quest</a>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-quests">
+            <p>No active quests at the moment. Check back soon!</p>
+            {# Optionally, add a button to request a new quest if applicable #}
+        </div>
+    {% endif %}
+
+    <div class="navbar">
+        <ul>
+            <li><a href="{{ url_for('quests') }}" class="button nav-link"><img src="{{ url_for('static', filename='QUESTSBLACK.png') }}" alt="quests"></a></li>
+            <li><a href="{{ url_for('friends_leaderboard') }}" class="button nav-link"><img src="{{ url_for('static', filename='duooo.png') }}" alt="leaderboard"></a></li>
+            <li><a href="{{ url_for('capture') }}" class="button largebutton nav-link"><img src="{{ url_for('static', filename='BLACKADD.png') }}" alt="capture"></a></li>
+            <li><a href="{{ url_for('profile') if 'profile' in_endpoints else '#' }}" class="button nav-link"><img src="{{ url_for('static', filename='PROFILEBLACK.png') }}" alt="profile"></a></li>
+        </ul>
+    </div>
+
+    <div id="slide-overlay"></div>
+
 <script>
+    // Navigation slide animation
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', function (e) {
-            if (this.getAttribute('href') === 'quests.html') return;
+            // Allow default behavior if it's the current page or an external link
+            if (window.location.pathname === new URL(this.href).pathname) return;
+
             e.preventDefault();
             const overlay = document.getElementById('slide-overlay');
+            const targetUrl = this.getAttribute('href');
+
+            // Determine slide direction (simple example)
+            // You might want more sophisticated logic based on navbar order
+            const currentPath = window.location.pathname;
+            if (targetUrl.includes('friends') && currentPath.includes('quests')) {
+                overlay.style.transformOrigin = 'left'; // Slide from left
+            } else if (targetUrl.includes('quests') && currentPath.includes('friends')) {
+                 overlay.style.transformOrigin = 'right'; // Slide from right
+            } else {
+                overlay.style.transformOrigin = 'left'; // Default
+            }
+
+
             overlay.classList.add('active');
             setTimeout(() => {
-                window.location = this.getAttribute('href');
-            }, 500);
+                window.location = targetUrl;
+            }, 400); // Match CSS transition duration
         });
     });
+
+    // Countdown timer for quests
+    function updateCountdown() {
+        const now = new Date();
+        document.querySelectorAll('.time-remaining').forEach(timerElement => {
+            const expiryString = timerElement.dataset.expiry;
+            if (!expiryString) {
+                timerElement.textContent = "No expiry date";
+                return;
+            }
+
+            const expiryDate = new Date(expiryString);
+            const timeLeft = expiryDate - now;
+
+            if (timeLeft < 0) {
+                timerElement.textContent = "Expired!";
+                timerElement.style.color = "red";
+                // Optionally, disable the "Complete Quest" button or change its text
+                const questBox = timerElement.closest('.questbox');
+                if (questBox) {
+                    const completeButton = questBox.querySelector('a.button');
+                    if (completeButton && completeButton.textContent.includes("Complete Quest")) {
+                        completeButton.textContent = "Quest Expired";
+                        completeButton.style.backgroundColor = "#aaa";
+                        completeButton.style.pointerEvents = "none";
+                    }
+                }
+                return;
+            }
+
+            const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+            let timeString = "";
+            if (days > 0) timeString += `${days}d `;
+            if (hours > 0 || days > 0) timeString += `${hours}h `; // Show hours if days are present or hours > 0
+            if (minutes > 0 || hours > 0 || days > 0) timeString += `${minutes}m `;
+            timeString += `${seconds}s`;
+
+            timerElement.textContent = timeString.trim() || "Expiring soon!";
+        });
+    }
+
+    // Update countdown every second
+    setInterval(updateCountdown, 1000);
+    // Initial call to display immediately
+    updateCountdown();
 </script>
 </body>
 </html>
