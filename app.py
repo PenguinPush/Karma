@@ -8,7 +8,7 @@ import re
 from bson.objectid import ObjectId
 
 from user import User  # Assuming user.py is in the same directory
-from web_scraper import get_jamhacks_data  # Assuming web_scraper.py is in the same directory
+from web_scraper import Scraper  # Assuming web_scraper.py is in the same directory
 
 from image_recognizer import get_image_labels_and_entities
 from gcs_uploader import upload_image_stream_to_gcs_for_user, \
@@ -19,6 +19,7 @@ from user import User
 load_dotenv()
 
 app = Flask(__name__)
+scraper = Scraper()
 
 client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
 db = client["karma"]
@@ -148,7 +149,7 @@ def url_to_user():
                 "new_user": False
             })
         else:
-            name, socials = get_jamhacks_data(jamhacks_code)
+            name, socials = scraper.get_jamhacks_data(jamhacks_code)
             user = User(
                 jamhacks_code,
                 name,

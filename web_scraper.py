@@ -7,52 +7,61 @@ from selenium.webdriver.firefox.options import Options
 import os
 from dotenv import load_dotenv
 
-def get_jamhacks_data(jamhacks_code):
-    print("loading!")
-    load_dotenv()
 
-    base_url = "https://app.jamhacks.ca/social/"
-    socials_url = "https://app.jamhacks.ca/social/" + str(jamhacks_code)
+class Scraper:
+    _instance = None
 
-    firefox_options = Options()
-    firefox_options.add_argument("--headless")
-    firefox_options.add_argument("--disable-gpu")
-    firefox_options.add_argument("--no-sandbox")
-    firefox_options.add_argument("--disable-dev-shm-usage")
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Scraper, cls).__new__(cls)
+            cls._instance._initialize_driver()
+        return cls._instance
 
-    driver = webdriver.Firefox(options=firefox_options)
-    driver.get(base_url)
+    def _initialize_driver(self):
+        firefox_options = Options()
+        firefox_options.add_argument("--headless")
+        firefox_options.add_argument("--disable-gpu")
+        firefox_options.add_argument("--no-sandbox")
+        firefox_options.add_argument("--disable-dev-shm-usage")
 
-    try:
-        driver.add_cookie({
-            "name": "__Secure-next-auth.session-token",
-            "value": os.getenv("__SECURE_NEXT_AUTH_SESSION_TOKEN"),
-            "domain": "app.jamhacks.ca",
-            "path": "/",
-            "secure": True,
-            "httpOnly": True
-        })
-    except Exception as e:
-        print(f"failed to set cookie: {e}")
+        self.driver = webdriver.Firefox(options=firefox_options)
+        self.driver.get("https://app.jamhacks.ca/social/")
 
-    driver.get(socials_url)
+        try:
+            self.driver.add_cookie({
+                "name": "__Secure-next-auth.session-token",
+                "value": os.getenv("__SECURE_NEXT_AUTH_SESSION_TOKEN"),
+                "domain": "app.jamhacks.ca",
+                "path": "/",
+                "secure": True,
+                "httpOnly": True
+            })
+        except Exception as e:
+            print(f"failed to set cookie: {e}")
 
-    try:
-        name_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.TAG_NAME, "h1"))
-        )
-        name = name_element.text
-        print(name)
+        print("DRIVER LOADED!!")
 
-        social_elements = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.TAG_NAME, "p"))
-        )
-        socials = [social.text for social in social_elements if len(social.text) != 0]
-        print(socials)
+    def get_jamhacks_data(self, jamhacks_code):
+        print("loading!")
+        load_dotenv()
 
-        return name, socials
+        print(self.driver)
+        self.driver.get("https://app.jamhacks.ca/social/" + str(jamhacks_code))
 
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        driver.quit()
+        try:
+            name_element = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.TAG_NAME, "h1"))
+            )
+            name = name_element.text
+            print(name)
+
+            social_elements = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_all_elements_located((By.TAG_NAME, "p"))
+            )
+            socials = [social.text for social in social_elements if len(social.text) != 0]
+            print(socials)
+
+            return name, socials
+
+        except Exception as e:
+            print(f"Error: {e}")
