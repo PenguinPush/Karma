@@ -6,117 +6,142 @@
     <title>Karma | Friends</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        /* Styles from your provided HTML - these will apply to dynamic entries too */
+        /* Adjust leaderboard width and spacing */
         .leaderboard {
-            width: 90%;
-            max-width: 700px;
-            margin: 20px auto;
+            width: 95%; /* Slightly wider to reduce blank space */
+            max-width: 600px; /* Reduce max width for better fit */
+            margin: 10px 0; /* Reduce vertical margin */
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 10px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 5px 0; /* Reduce padding */
         }
+
+        /* Adjust entry spacing and alignment */
         .entry {
             display: flex;
             align-items: center;
-            padding: 15px 20px;
+            padding: 10px 15px; /* Reduce padding */
             border-bottom: 1px solid #eee;
             transition: background-color 0.2s ease-in-out;
         }
+
         .entry:last-child {
             border-bottom: none;
         }
+
         .entry:hover {
-            background-color: #f9f9f9;
-        }
-        .placement {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #007bff;
-            margin-right: 20px;
-            width: 40px;
-            text-align: center;
-        }
-        .info {
-            flex-grow: 1;
-        }
-        .user { /* Base styles for user, inline styles will override/add */
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #333;
-            /* margin: 0 0 5px 0; Removed to match inline style precisely */
-        }
-        .points { /* Base styles for points, inline styles will override/add */
-            font-size: 0.95em;
-            color: #555;
-            /* margin: 0; Removed to match inline style precisely */
-        }
-        .addfriendsbutton {
-            text-align: center;
-            margin-top: 0px;
-            margin-bottom: 100px;
-        }
-        .addfriendsbutton h2 a {
-            text-decoration: none;
-            color: #007bff;
-            font-size: 1.2em;
-            padding: 10px 10px;
-            border-radius: 5px;
-            transition: background-color 0.2s, color 0.2s;
-        }
-        .addfriendsbutton h2 a:hover {
-            background-color: #007bff;
-            color: white;
-        }
-        .addfriendsbutton img {
-            vertical-align: middle;
-            margin-right: 8px;
-            width: 24px;
-            height: 24px;
-        }
-        .navbar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: #fff;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-            padding: 10px 0;
-            z-index: 1000;
+            background-color: #f5f5f5; /* Slightly lighter hover effect */
         }
 
+        /* Adjust placement size and alignment */
+        .placement {
+            font-size: 1.2em; /* Slightly smaller font */
+            font-weight: bold;
+            color: #007bff;
+            margin-right: 15px; /* Reduce margin */
+            width: 30px; /* Reduce width */
+            text-align: center;
+        }
+
+        /* Adjust user and points text */
+        .user {
+            font-size: 1em; /* Slightly smaller font */
+            font-weight: 600;
+            color: #333;
+        }
+
+        .points {
+            font-size: 0.9em; /* Slightly smaller font */
+            color: #555;
+        }
+
+        /* Adjust add friends button spacing */
+        .addfriendsbutton {
+            position: relative; /* Make the button non-scrollable */
+            text-align: center;
+            margin: 0; /* Remove unnecessary margins */
+            white-space: nowrap; /* Prevent text wrapping */
+            overflow: hidden; /* Hide any overflow */
+            display: inline-block; /* Ensure proper layout */
+        }
+
+        .addfriendsbutton h3 a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 1.1em; /* Slightly smaller font */
+            padding: 8px 10px; /* Adjust padding */
+            border-radius: 5px;
+            transition: background-color 0.2s, color 0.2s;
+            white-space: nowrap; /* Prevent text wrapping */
+            overflow: hidden; /* Hide any overflow */
+            display: inline-block; /* Ensure proper layout */
+        }
+
+        .addfriendsbutton img {
+            vertical-align: middle;
+            margin-right: 5px; /* Reduce margin */
+            width: 20px; /* Reduce size */
+            height: 20px;
+            white-space: nowrap; /* Prevent text wrapping */
+            overflow: hidden; /* Hide any overflow */
+            display: inline-block; /* Ensure proper layout */
+        }
+
+        /* Adjust entry spacing and alignment */
+        .entry {
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Ensure proper spacing */
+            padding: 10px 10px;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s ease-in-out;
+            flex-wrap: nowrap; /* Prevent wrapping */
+        }
+
+        .info {
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 1; /* Allow shrinking */
+            min-width: 0; /* Prevent overflow */
+        }
+
+        .user, .points {
+            white-space: nowrap; /* Prevent text wrapping */
+            overflow: hidden; /* Hide overflow */
+            text-overflow: ellipsis; /* Add ellipsis for overflowed text */
+        }
     </style>
 </head>
 <body>
-<h1>Friends</h1>
-<br>
+<div class="heading-box"><h1>Friends</h1></div>
 <div class="leaderboard">
     {# Check if leaderboard_users list is provided and not empty #}
     {% if leaderboard_users %}
-        {# Loop through the sorted list of users passed from Flask #}
-        {% for user_entry in leaderboard_users %}
-        <div class="entry">
-            <p class="placement">{{ loop.index }}</p> {# loop.index gives 1-based placement #}
-            <div class="info">
-                {# Applying the inline styles from your original hardcoded example #}
-                <p class="user" style="margin-bottom: 5px;">{{ user_entry.name }}</p>
-                <p class="points" style="font-size: 17px; margin-top: 0px;">{{ user_entry.karma }} points</p>
-            </div>
+    {# Loop through the sorted list of users passed from Flask #}
+    {% for user_entry in leaderboard_users %}
+    <div class="entry">
+        <p class="placement">{{ loop.index }}</p> {# loop.index gives 1-based placement #}
+        <div class="info">
+            {# Applying the inline styles from your original hardcoded example #}
+            <p class="user" style="margin-bottom: 5px;">{{ user_entry.name }}</p>
+            <p class="points" style="font-size: 17px; margin-top: 0px;">{{ user_entry.karma }} points</p>
         </div>
-        {% endfor %}
+    </div>
+    {% endfor %}
     {% else %}
-        {# Display a message if the leaderboard is empty or not provided #}
-        <div style="text-align: center; padding: 20px;">
-            <p>No users found to display on the leaderboard.</p>
-        </div>
+    {# Display a message if the leaderboard is empty or not provided #}
+    <div style="text-align: center; padding: 20px;">
+        <p>No users found to display on the leaderboard.</p>
+    </div>
     {% endif %}
 </div>
 <div class="addfriendsbutton">
-    <h2><a href="add_friend"><img src="../static/duooo.png" alt="Add Friends"> Add Friends</a></h2>
+    <h3><a href="add_friend"><img src="../static/duooo.png" alt="Add Friends"> Add Friends</a></h3>
 </div>
 <div class="navbar">
     <ul>
-        <li><a href="quests" class="button"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
-        <li><a href="/" class="button"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
+        <li><a href="quests" class="button"><img src="../static/BLUE.png" alt="quests"></a></li>
+        <li><a href="/" class="button"><img src="../static/BLUEPERSON.png" alt="profile"></a></li>
     </ul>
 </div>
 </body>
