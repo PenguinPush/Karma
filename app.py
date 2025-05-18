@@ -298,7 +298,7 @@ def onboarding_pg1():
         current_user = ObjectId(get_user_session())
         friend_user = ObjectId(friend_id)
 
-        response = make_response(redirect('/onboarding_pg2'))
+        response = make_response(redirect('/'))
         users_collection.update_one(
             {"_id": current_user},
             {"$addToSet": {"friends": friend_user}}

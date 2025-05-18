@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="../static/styles.css">
     <style>
         #scanner {
-            position: relative;
+            position: absolute;
             width: calc(100% - 20px);
             margin: 10px;
             height: calc(100vh - 20px);
@@ -16,7 +16,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@10.5.3000/dist/dbr.bundle.js"></script>
 </head>
 <body>
-    <h1 style="text-align: center; justify-content: center;">Creating a new user, please wait a moment!!</h1>
+    <h1 style="text-align: center; justify-content: center;" id="message">Creating a new user, please wait a moment!!</h1>
     <div id="scanner"></div>
 
     <script>
@@ -60,7 +60,7 @@
                         if (!loginResponse.ok) {
                             throw new Error(`Error from /friends: ${loginResponse.status}`);
                         }
-                        window.location.href = '/onboarding_pg2';
+                        window.location.href = '/';
                     } catch (error) {
                         console.error('friends failed:', error);
                         alert('friends failed. Please try again.');

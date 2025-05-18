@@ -21,7 +21,7 @@ class User:
         self.socials = socials if socials else []
         self.karma = karma
         self.phone = phone
-        self.friends = friends if friends else [ObjectId("6829233a6270e432ef8c6a1d"), ObjectId("68281d8502303e5c7fd9992c"), ObjectId("68294ace9d79ac25bcdce7ad")]  # store as list of objectid pointers
+        self.friends = friends if friends else []  # store as list of objectid pointers
         self.quests = quests if quests else []
         self.photos = photos if photos else []  # list of pointers to google cloud
         self._id = _id
