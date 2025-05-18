@@ -68,6 +68,23 @@ def get_user_session():
     return request.cookies.get('user_session')
 
 
+def generate_gcs_public_url(bucket_part, object_part):
+    base_url = "https://storage.googleapis.com"
+    return f"{base_url}/{bucket_part}/{object_part}"
+
+
+def convert_gs_to_public_url(gs_uri):
+    if not gs_uri.startswith("gs://"):
+        raise ValueError("Invalid GCS URI. It must start with 'gs://'.")
+
+    return gs_uri.replace("gs://", "https://storage.googleapis.com/", 1)
+
+
+# Example usage
+gs_uri = "gs://my-bucket/my-object.jpg"
+public_url = convert_gs_to_public_url(gs_uri)
+print(public_url)  # Output: https://storage.googleapis.com/my-bucket/my-object.jpg
+
 def allowed_file(filename):
     """Checks if the file's extension is allowed."""
     return '.' in filename and \
@@ -534,8 +551,7 @@ def upload_endpoint():
             print(f"Image uploaded to GCS: {gcs_uri}")
             session_results["gcs_uri"] = gcs_uri
             gcs_bucket_part, gcs_object_part = gcs_uri.replace("gs://", "").split("/", 1)
-            session_results["display_image_url"] = url_for('serve_gcs_image', bucket_name=gcs_bucket_part,
-                                                           object_path=gcs_object_part)
+            session_results["display_image_url"] = generate_gcs_public_url(gcs_bucket_part, gcs_object_part)
 
             image_labels_dict = get_image_labels_and_entities(gcs_uri)
             if not image_labels_dict or "error" in image_labels_dict:
@@ -731,7 +747,17 @@ def get_user_json():
 
         friends = [str(friend) for friend in user.get("friends", [])]
         quests = [str(quest) for quest in user.get("quests", [])]
-        photos = [str(photo) for photo in user.get("photos", [])]
+
+        photo_ids = [ObjectId(photo) for photo in user.get("photos", [])]
+
+        photo_docs = list(photos_collection.find({"_id": {"$in": photo_ids}}))
+        photo_urls = []
+        photo_quest_ids = []
+
+        for doc in photo_docs:
+            photo_urls.append(convert_gs_to_public_url(doc.get("url")))
+            photo_quest_ids.append(str(doc.get("quest_id")))
+            print(doc.get("url"))
 
         return jsonify({
             "jamhacks_code": user.get("jamhacks_code"),
@@ -741,7 +767,8 @@ def get_user_json():
             "phone": user.get("phone"),
             "friends": friends,
             "quests": quests,
-            "photos": photos,
+            "photo_urls": photo_urls,
+            "photo_quest_ids": photo_quest_ids
         })
 
     except Exception as e:
