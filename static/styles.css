@@ -5,27 +5,21 @@ html, body {
     margin: 0; /* Remove default margin */
 }
 
-/* Ensure content is mindful of the navbar */
-body {
-    padding-bottom: 80px; /* Adjust based on navbar height */
-}
-
 body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 100vh; /* Ensure it takes the full viewport height */
+    min-height: 90vh; /* Ensure it takes the full viewport height */
     margin: 0;
     padding: 0;
 }
 
 .heading-box {
-    position: sticky; /* Makes the box stick to the top */
     top: 0;
-    width: 90%; /* Adjust width as needed */
+    width: 85%; /* Adjust width as needed */
     max-width: 600px; /* Limit the maximum width */
     /* Center the box and add vertical spacing */
-    margin: -5px auto 5px;
+    margin: 0 auto;
     padding: 5px; /* Add padding inside the box */
     background-color: #f9f9f9; /* Light background color */
     border-radius: 10px; /* Rounded corners */
