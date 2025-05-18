@@ -32,7 +32,7 @@ ATLAS_VECTOR_SEARCH_INDEX_NAME = "vector_index"
 OPENAI_EMBEDDING_MODEL = "text-embedding-3-large" # Using the model specified by the user
 
 print("a")  # From user's provided code; keeping it as requested.
-SIMILARITY_THRESHOLD = 0.80 # User specified 0.80. Note: OpenAI embedding similarity scores might behave differently.
+SIMILARITY_THRESHOLD = 0.85 # User specified 0.80. Note: OpenAI embedding similarity scores might behave differently.
 
 # Initialize OpenAI client
 # This will raise an exception if OPENAI_API_KEY is not set or client init fails.

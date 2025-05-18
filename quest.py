@@ -10,8 +10,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Define a list of possible quest categories for random selection
-# This can be expanded or moved to a configuration file.
 POSSIBLE_QUEST_CATEGORIES = [
     "Recycling Activity",
     "Litter Pickup",
