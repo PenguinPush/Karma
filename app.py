@@ -102,24 +102,104 @@ def index():
 # --- Updated /quests route ---
 @app.route("/quests")
 def quests():
-    user_session_id = get_user_session()
-    if not user_session_id:
-        return redirect('/login')  # Redirect to login if no session
+    user_session_id_str = get_user_session()
+    if not user_session_id_str:
+        return redirect('/login')
 
-    # Fetch pending quests for the current user.
-    # The Quest.get_quests_for_user method expects the user_to_id as a string.
-    # The user_session_id from the cookie is already a string (ObjectId converted to string).
-    user_active_quests = Quest.get_quests_for_user(quests_collection, user_session_id, status="pending")
+    try:
+        user_object_id = ObjectId(user_session_id_str)
+        current_user = User.get_user_by_id(users_collection, user_object_id)
+        user_name_for_template = current_user.name if current_user else "User"
 
-    # You might want to fetch user's name to display on the page too
-    current_user = User.get_user_by_id(users_collection, ObjectId(user_session_id))
-    user_name = current_user.name if current_user else "User"
+        if not current_user:
+            print(f"User {user_session_id_str} not found in DB. Redirecting to login.")
+            return redirect('/login')
 
-    print(f"Fetched {len(user_active_quests)} pending quests for user {user_session_id}")
-    print(user_active_quests)
-    return render_template("quests.html",
-                           user_quests=user_active_quests,
-                           user_name=user_name)
+        # --- Handle existing expired pending quests for the user ---
+        print(f"Checking for existing pending quests for user {user_session_id_str}...")
+        # Fetch as a list to iterate and potentially modify the collection during iteration
+        pending_quests_docs = list(quests_collection.find({"user_to_id": user_session_id_str, "status": "pending"}))
+
+        for quest_doc in pending_quests_docs:
+            quest_obj = Quest.from_mongo(quest_doc)
+            if quest_obj.is_expired():  # is_expired() should use quest_doc's expiry_time
+                print(f"Found expired pending quest: {quest_obj.quest_id_str} for user {user_session_id_str}")
+                # handle_expiry_and_regenerate_data deletes the old quest and returns data for a new one.
+                new_system_quest_data = quest_obj.handle_expiry_and_regenerate_data(
+                    quests_collection,
+                    POSSIBLE_QUEST_CATEGORIES
+                )
+                if new_system_quest_data:
+                    # Save the new system quest that replaces the expired one
+                    quests_collection.insert_one(new_system_quest_data)
+                    new_regenerated_quest_id_str = new_system_quest_data["quest_id_str"]
+                    print(
+                        f"Replaced expired quest {quest_obj.quest_id_str} with new system quest {new_regenerated_quest_id_str} for user {user_session_id_str}.")
+
+                    # Update user's quest list in DB: remove old, add new
+                    users_collection.update_one(
+                        {"_id": user_object_id},
+                        {"$pull": {"quests": quest_obj.quest_id_str}}
+                    )
+                    users_collection.update_one(
+                        {"_id": user_object_id},
+                        {"$push": {"quests": new_regenerated_quest_id_str}}
+                    )
+                else:
+                    # This case implies handle_expiry_and_regenerate_data decided not to regenerate
+                    # or failed, which might mean the quest wasn't truly expired or pending from its perspective.
+                    print(
+                        f"Quest {quest_obj.quest_id_str} was not regenerated after expiry check (possibly already handled or not expired).")
+
+        # Re-fetch active quests after handling expiries
+        user_active_quests = Quest.get_quests_for_user(quests_collection, user_session_id_str, status="pending")
+
+        # If no pending quests exist after expiry handling, generate a new one
+        if not user_active_quests:
+            print(
+                f"No pending quests for user {user_session_id_str} after expiry check. Generating a new system quest.")
+            target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
+            duration_seconds = 24 * 60 * 60  # Default 24 hours
+
+            # Use Quest.generate_new_system_quest_data from quest.py
+            new_quest_data = Quest.generate_new_system_quest_data(
+                user_to_id=user_session_id_str,  # Pass user_id as string
+                target_category=target_category,
+                duration_seconds=duration_seconds
+            )
+            # Save the new quest data to the quests_collection
+            quests_collection.insert_one(new_quest_data)
+            new_quest_id_str = new_quest_data["quest_id_str"]
+            print(f"New system quest {new_quest_id_str} generated and saved for user {user_session_id_str}.")
+
+            # Add the quest_id_str to the user's 'quests' list in their document
+            users_collection.update_one(
+                {"_id": user_object_id},
+                {"$push": {"quests": new_quest_id_str}}
+            )
+            # Fetch this new quest to display it
+            # Quest.from_mongo expects a dict that includes _id if it's from DB.
+            # Here, new_quest_data doesn't have _id yet, but Quest constructor can handle it.
+            newly_generated_quest_object = Quest(
+                user_to_id=new_quest_data["user_to_id"],
+                target_category=new_quest_data["target_category"],
+                expiry_time=new_quest_data["expiry_time"],
+                quest_id_str=new_quest_data["quest_id_str"]
+                # mongo_id will be assigned when/if this object is saved via its own save_to_db
+            )
+            user_active_quests = [newly_generated_quest_object]
+
+        print(f"Displaying {len(user_active_quests)} pending quests for user {user_session_id_str}.")
+
+        return render_template("quests.html",
+                               user_quests=user_active_quests,
+                               user_name=user_name_for_template)
+    except Exception as e:
+        print(f"Error fetching quests for user {user_session_id_str}: {e}")
+        import traceback
+        traceback.print_exc()
+        return render_template("quests.html", user_quests=[], user_name=get_user_session(),
+                               error_message="Could not load quests.")
 
 
 @app.route("/capture")
@@ -159,68 +239,10 @@ def onboarding_pg1():
 
 @app.route('/onboarding_pg2')
 def onboarding_pg2():
-    redirect('/onboarding_pg3')
+    redirect('/quests')
 
     return render_template("onboarding_pg2.html")
 
-
-
-
-@app.route('/onboarding_pg3', methods=['GET'])
-def onboarding_pg3():
-    try:
-
-        current_user = get_user_session()
-
-
-        # Generate quest data using the method from Quest class
-        # This assumes Quest.generate_new_system_quest_data is available and works as expected
-        # It returns a dictionary, not a Quest object directly, which is suitable for DB insertion.
-        target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
-        duration_seconds = 60 * 60  # Default 1 hours for an onboarding quest
-
-        new_quest_data = Quest.generate_new_system_quest_data(
-            user_to_id=current_user,  # Quest class expects user_to_id as string
-            target_category=target_category,
-            duration_seconds=duration_seconds
-        )
-
-        # Save the new quest to the quests_collection
-        result = quests_collection.insert_one(new_quest_data)
-        new_quest_mongo_id = result.inserted_id
-        new_quest_id_str = new_quest_data["quest_id_str"]  # Get the app-level quest ID
-
-        print(
-            f"New onboarding quest {new_quest_id_str} created for user {current_user} with MongoDB ID {new_quest_mongo_id}.")
-
-        # Add the quest_id_str to the user's 'quests' list in their document
-        update_user_result = users_collection.update_one(
-            {"_id": current_user},
-            {"$push": {"quests": new_quest_id_str}}
-        )
-
-        if update_user_result.modified_count > 0:
-            print(f"Quest {new_quest_id_str} added to user {current_user}'s quest list.")
-        else:
-            # This might happen if the user doc was found but update failed, or if $push didn't modify (e.g., already there, though unlikely for new quest)
-            print(f"Warning: User {current_user}'s quest list might not have been updated, or quest ID already present.")
-
-        return jsonify({
-            "message": "Onboarding quest generated successfully.",
-            "user_id": current_user,
-            "quest_id_str": new_quest_id_str,
-            "target_category": target_category,
-            "expiry_time": new_quest_data["expiry_time"].isoformat()  # Return expiry time
-        }), 201  # 201 Created
-
-    except RuntimeError as e:  # Catch if placeholder Quest functions are called
-        print(f"A critical imported function for Quest generation is missing: {e}")
-        return jsonify({"error": f"Server configuration error for quest generation: {e}"}), 500
-    except Exception as e:
-        print(f"Error in /generate_onboarding_quest: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
 
 @app.route('/friends')
 def friends():
@@ -494,3 +516,18 @@ def get_user_json():
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5002))
     app.run(host='0.0.0.0', port=port, debug=True)
+    target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
+    duration_seconds = 24 * 60 * 60  # Default 24 hours for an onboarding quest
+
+    # Quest.generate_new_system_quest_data returns a dict with creation_time and expiry_time
+    new_quest_data = Quest.generate_new_system_quest_data(
+        user_to_id=str(ObjectId(get_user_session())),  # Pass the string representation of ObjectId
+        target_category=target_category,
+        duration_seconds=duration_seconds
+    )
+
+    # Save the new quest (which includes creation_time and expiry_time) to the quests_collection
+    result = quests_collection.insert_one(new_quest_data)
+    new_quest_mongo_id = result.inserted_id
+    new_quest_id_str = new_quest_data["quest_id_str"]
+    print(str(result) + 'asodhsakjdb')
