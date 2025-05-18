@@ -17,6 +17,7 @@ from gcs_uploader import upload_image_stream_to_gcs_for_user, \
 from classifier import get_description, classify
 from semantic_search import process_activity_and_get_points
 from user import User
+from photo import Photo
 from quest import Quest, POSSIBLE_QUEST_CATEGORIES
 
 load_dotenv()
@@ -30,6 +31,7 @@ client = MongoClient(MONGO_URI, tls=True, tlsCAFile=certifi.where())
 db = client["karma"]
 users_collection = db["users"]
 quests_collection = db["quests"]
+photos_collection = db["photos"]
 
 
 def get_user_session():
@@ -237,11 +239,69 @@ def onboarding_pg1():
 
     return render_template('onboarding_pg1.html')
 
+
 @app.route('/onboarding_pg2')
 def onboarding_pg2():
     redirect('/quests')
 
     return render_template("onboarding_pg2.html")
+
+
+@app.route('/onboarding_pg3', methods=['GET'])
+def onboarding_pg3():
+    try:
+
+        current_user = get_user_session()
+
+        # Generate quest data using the method from Quest class
+        # This assumes Quest.generate_new_system_quest_data is available and works as expected
+        # It returns a dictionary, not a Quest object directly, which is suitable for DB insertion.
+        target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
+        duration_seconds = 60 * 60  # Default 1 hours for an onboarding quest
+
+        new_quest_data = Quest.generate_new_system_quest_data(
+            user_to_id=current_user,  # Quest class expects user_to_id as string
+            target_category=target_category,
+            duration_seconds=duration_seconds
+        )
+
+        # Save the new quest to the quests_collection
+        result = quests_collection.insert_one(new_quest_data)
+        new_quest_mongo_id = result.inserted_id
+        new_quest_id_str = new_quest_data["quest_id_str"]  # Get the app-level quest ID
+
+        print(
+            f"New onboarding quest {new_quest_id_str} created for user {current_user} with MongoDB ID {new_quest_mongo_id}.")
+
+        # Add the quest_id_str to the user's 'quests' list in their document
+        update_user_result = users_collection.update_one(
+            {"_id": current_user},
+            {"$push": {"quests": new_quest_id_str}}
+        )
+
+        if update_user_result.modified_count > 0:
+            print(f"Quest {new_quest_id_str} added to user {current_user}'s quest list.")
+        else:
+            # This might happen if the user doc was found but update failed, or if $push didn't modify (e.g., already there, though unlikely for new quest)
+            print(
+                f"Warning: User {current_user}'s quest list might not have been updated, or quest ID already present.")
+
+        return jsonify({
+            "message": "Onboarding quest generated successfully.",
+            "user_id": current_user,
+            "quest_id_str": new_quest_id_str,
+            "target_category": target_category,
+            "expiry_time": new_quest_data["expiry_time"].isoformat()  # Return expiry time
+        }), 201  # 201 Created
+
+    except RuntimeError as e:  # Catch if placeholder Quest functions are called
+        print(f"A critical imported function for Quest generation is missing: {e}")
+        return jsonify({"error": f"Server configuration error for quest generation: {e}"}), 500
+    except Exception as e:
+        print(f"Error in /generate_onboarding_quest: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
 
 
 @app.route('/friends')
@@ -250,7 +310,8 @@ def friends():
         print(get_user_session())
         current_user = User.get_user_by_id(users_collection, get_user_session())
         all_users_from_db = current_user.friends + [ObjectId(get_user_session())]
-        user_objects = [User.get_user_by_id(users_collection, user_objectid) for user_objectid in all_users_from_db if User.get_user_by_id(users_collection, user_objectid) is not None]
+        user_objects = [User.get_user_by_id(users_collection, user_objectid) for user_objectid in all_users_from_db if
+                        User.get_user_by_id(users_collection, user_objectid) is not None]
         # Sort users by karma in descending order
         # The User objects themselves will be sorted
         sorted_leaderboard_users = sorted(user_objects, key=lambda u: u.karma, reverse=True)
@@ -334,95 +395,81 @@ def upload_endpoint():
         return jsonify({"error": "No image file part in the request."}), 400
 
     file = request.files['image_file']
-    user_id_str = request.form.get('user_id')
+    user_id_str = get_user_session()
+    quest_id_str = request.form.get('quest_id')
 
     if not user_id_str:
-        return jsonify({"error": "User ID (uploader_user_id) is required."}), 400
+        return jsonify({"error": "User ID is required."}), 400
+
+    if not quest_id_str:
+        return jsonify({"error": "Quest ID is required."}), 400
 
     if file.filename == '':
         return jsonify({"error": "No image selected for uploading."}), 400
 
     if file and allowed_file(file.filename):
         original_filename = secure_filename(file.filename)
-        gcs_uri = None
-
         try:
-            print(
-                f"Calling GCS stream uploader for user_id_folder: {user_id_str}, original filename: {original_filename}")
             gcs_uri = upload_image_stream_to_gcs_for_user(
                 file_stream=file,
                 original_filename=original_filename,
                 user_id_folder=user_id_str,
                 content_type=file.content_type
             )
-
             if not gcs_uri:
-                print("GCS stream upload function returned None.")
                 return jsonify({"error": "Image upload to Google Cloud Storage failed."}), 500
 
-            print(f"Successfully uploaded to GCS: {gcs_uri}")
-
-            print("\nStep 1 (Flask): Getting image labels from Image_recognizer...")
             image_labels_dict = get_image_labels_and_entities(gcs_uri)
-
             if not image_labels_dict or "error" in image_labels_dict:
-                error_msg = image_labels_dict.get("error", "Failed to get image labels.") if isinstance(
-                    image_labels_dict, dict) else "Failed to get image labels."
-                print(f"Error from Image Recognizer: {error_msg}")
+                error_msg = image_labels_dict.get("error", "Failed to get image labels.")
                 return jsonify({"error": f"Label extraction failed: {error_msg}", "gcs_uri": gcs_uri}), 500
 
             formatted_labels = [f"{desc.capitalize()} (Score: {score:.2f})" for desc, score in
                                 image_labels_dict.items()]
-            print(f"Image Labels from Recognizer: {formatted_labels if formatted_labels else 'None'}")
-
-            print("\nStep 2 (Flask): Getting activity description from classifier...")
-            img_activity_description = get_description(formatted_labels)
-            if not img_activity_description:
-                print("Warning: get_description returned None. Using a default description.")
-                img_activity_description = "Activity could not be automatically described from labels."
-            print(f"Generated Activity Description: {img_activity_description}")
-
-            print("\nStep 3 (Flask): Classifying Good Samaritan category from classifier...")
-            good_samaritan_category = classify(img_activity_description, formatted_labels)
-            if good_samaritan_category is None:
-                print("Warning: classify returned None. Using a default category.")
-                good_samaritan_category = "No Specific Good Samaritan Activity Detected"
-            print(f"Classified Category: {good_samaritan_category}")
-
-            print("\nStep 4 (Flask): Processing activity for karma points from semantic_search...")
+            img_activity_description = get_description(formatted_labels) or "No activity description."
+            good_samaritan_category = classify(img_activity_description, formatted_labels) or "Unclassified"
             karma_points_info = process_activity_and_get_points(
                 activity_category=good_samaritan_category,
                 activity_description=img_activity_description,
                 detected_labels=formatted_labels
             )
 
-            print(f"Karma Points Calculated: {karma_points_info}")
-
-            current_user_karma = "User not found or karma not updated"
             try:
-                user_object_id = ObjectId(user_id_str)  # Convert user_id string to ObjectId
+                user_object_id = ObjectId(user_id_str)
                 update_result = users_collection.update_one(
                     {"_id": user_object_id},
                     {
                         "$inc": {"karma": karma_points_info},
-                        "$push": {"photos": gcs_uri}
                     }
                 )
-                if update_result.matched_count > 0:
-                    print(f"User {user_id_str}'s karma and photos updated in MongoDB.")
-                    updated_user_doc = users_collection.find_one({"_id": user_object_id}, {"karma": 1})
-                    if updated_user_doc:
-                        current_user_karma = updated_user_doc.get("karma", "Could not fetch updated karma")
-                else:
-                    print(
-                        f"Warning: User with ID {user_id_str} (ObjectId: {user_object_id}) not found in DB for update.")
-                    current_user_karma = "User not found for update"
+                current_user_karma = "User not found" if update_result.matched_count == 0 else users_collection.find_one(
+                    {"_id": user_object_id}, {"karma": 1}
+                ).get("karma", "Karma not found")
             except Exception as e_db_update:
-                print(f"Error updating user {user_id_str} in MongoDB: {e_db_update}")
                 current_user_karma = "Error during karma update"
+                print(f"DB error: {e_db_update}")
+
+            # Save photo referencing user and quest
+            new_photo = Photo(user_id=ObjectId(user_id_str), quest_id=ObjectId(quest_id_str), url=gcs_uri)
+            new_photo.save_to_db(photos_collection)
+
+            users_collection.update_one(
+                {"_id": ObjectId(user_id_str)},
+                {"$push": {"photos": new_photo.id()}}
+            )
+
+            # Insert reference into quest, mark as complete
+            quests_collection.update_one(
+                {"_id": ObjectId(quest_id_str)},
+                {"$set": {
+                    "completion_image_uri": new_photo.id(),
+                    "status": "complete"
+                }}
+            )
 
             return jsonify({
                 "message": f"Image '{original_filename}' processed successfully for user '{user_id_str}'.",
+                "quest_id": quest_id_str,
                 "gcs_uri": gcs_uri,
                 "image_labels": formatted_labels,
                 "activity_description": img_activity_description,
@@ -431,14 +478,11 @@ def upload_endpoint():
                 "user_current_karma": current_user_karma
             }), 200
 
-        except RuntimeError as e:
-            print(f"A critical imported function is missing: {e}")
-            return jsonify({"error": f"Server configuration error: {e}"}), 500
         except Exception as e:
-            print(f"An error occurred in the /upload_endpoint route: {e}")
+            print(f"Error in /upload_endpoint route: {e}")
             import traceback
             traceback.print_exc()
-            return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
+            return jsonify({"error": f"Server error: {str(e)}"}), 500
     else:
         allowed_ext_str = ", ".join(sorted([ext.lstrip('.') for ext in ALLOWED_IMAGE_EXTENSIONS]))
         return jsonify({"error": f"Invalid file type. Allowed types are: {allowed_ext_str}"}), 400
@@ -447,7 +491,6 @@ def upload_endpoint():
 @app.route("/upload_photo")
 def upload_photo():
     return render_template("upload_photo.html")
-
 
 
 @app.route('/add_friend', methods=['GET', 'POST'])
