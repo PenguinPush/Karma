@@ -1,5 +1,7 @@
 import certifi
 import os
+import random
+
 from flask import Flask, request, jsonify, redirect, make_response, render_template
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -15,6 +17,8 @@ from gcs_uploader import upload_image_stream_to_gcs_for_user, \
 from classifier import get_description, classify
 from semantic_search import process_activity_and_get_points
 from user import User
+from quest import Quest, POSSIBLE_QUEST_CATEGORIES
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -25,6 +29,7 @@ MONGO_URI = os.getenv("MONGO_CONNECTION_STRING")
 client = MongoClient(MONGO_URI, tls=True, tlsCAFile=certifi.where())
 db = client["karma"]
 users_collection = db["users"]
+quests_collection = db["quests"]
 
 
 def get_user_session():
@@ -133,11 +138,70 @@ def onboarding_pg1():
 
     return render_template('onboarding_pg1.html')
 
-
-@app.route("/onboarding_pg2")
+@app.route('/onboarding_pg2')
 def onboarding_pg2():
+    redirect('/onboarding_pg3')
+
     return render_template("onboarding_pg2.html")
 
+
+
+
+@app.route('/onboarding_pg3', methods=['GET'])
+def onboarding_pg3():
+    try:
+
+        current_user = get_user_session()
+
+
+        # Generate quest data using the method from Quest class
+        # This assumes Quest.generate_new_system_quest_data is available and works as expected
+        # It returns a dictionary, not a Quest object directly, which is suitable for DB insertion.
+        target_category = random.choice(POSSIBLE_QUEST_CATEGORIES)
+        duration_seconds = 60 * 60  # Default 1 hours for an onboarding quest
+
+        new_quest_data = Quest.generate_new_system_quest_data(
+            user_to_id=current_user,  # Quest class expects user_to_id as string
+            target_category=target_category,
+            duration_seconds=duration_seconds
+        )
+
+        # Save the new quest to the quests_collection
+        result = quests_collection.insert_one(new_quest_data)
+        new_quest_mongo_id = result.inserted_id
+        new_quest_id_str = new_quest_data["quest_id_str"]  # Get the app-level quest ID
+
+        print(
+            f"New onboarding quest {new_quest_id_str} created for user {current_user} with MongoDB ID {new_quest_mongo_id}.")
+
+        # Add the quest_id_str to the user's 'quests' list in their document
+        update_user_result = users_collection.update_one(
+            {"_id": current_user},
+            {"$push": {"quests": new_quest_id_str}}
+        )
+
+        if update_user_result.modified_count > 0:
+            print(f"Quest {new_quest_id_str} added to user {current_user}'s quest list.")
+        else:
+            # This might happen if the user doc was found but update failed, or if $push didn't modify (e.g., already there, though unlikely for new quest)
+            print(f"Warning: User {current_user}'s quest list might not have been updated, or quest ID already present.")
+
+        return jsonify({
+            "message": "Onboarding quest generated successfully.",
+            "user_id": current_user,
+            "quest_id_str": new_quest_id_str,
+            "target_category": target_category,
+            "expiry_time": new_quest_data["expiry_time"].isoformat()  # Return expiry time
+        }), 201  # 201 Created
+
+    except RuntimeError as e:  # Catch if placeholder Quest functions are called
+        print(f"A critical imported function for Quest generation is missing: {e}")
+        return jsonify({"error": f"Server configuration error for quest generation: {e}"}), 500
+    except Exception as e:
+        print(f"Error in /generate_onboarding_quest: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
 
 @app.route('/friends')
 def friends():
