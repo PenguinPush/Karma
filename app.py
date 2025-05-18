@@ -1,6 +1,5 @@
 import certifi
 import os
-import uuid
 from flask import Flask, request, jsonify, redirect, make_response, render_template
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -8,7 +7,6 @@ from pymongo import MongoClient
 import re
 from bson.objectid import ObjectId
 
-from user import User  # Assuming user.py is in the same directory
 from web_scraper import Scraper  # Assuming web_scraper.py is in the same directory
 
 from image_recognizer import get_image_labels_and_entities
@@ -94,12 +92,6 @@ def check_user_session():
 @app.route("/")
 def index():
     return render_template("index.html")
-
-
-@app.route("/profile")
-def profile():
-    return render_template("profile.html")
-
 
 @app.route("/quests")
 def quests():

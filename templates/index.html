@@ -1,15 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-    <title>Karma | Login</title>
-    <link rel="stylesheet" href="../static/styles.css"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karma | Profile</title>
+    <link rel="stylesheet" href="../static/styles.css">
 </head>
 <body>
-<h1>(logo) Karma</h1>
-<div class="loginbutton">
-    test
+<h1>Profile</h1>
+<br>
+<div class="profile">
+    <h2 id="name">Username</h2>
+    <h3 id="karma">Total Karma: 10 limbillion</h3>
+</div>
+<!-- display all images from user here! -->
+<div class="allimages">
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
+    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
 </div>
 <div class="navbar">
     <ul>
@@ -19,9 +33,24 @@
         <li><a href="profile" class="button"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
     </ul>
 </div>
-<div id="user-data">
-    <p>Loading user data...</p>
-</div>
 <script src="../static/loadUserData.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        const userData = await loadUserData();
+        if (userData) {
+            const name = userData.name;
+            const socials = userData.socials;
+            const karma = userData.karma;
+            const phone = userData.phone;
+            const friends = userData.friends;
+            const quests = userData.quests;
+            const photos = userData.photos;
+            console.log(userData)
+
+            document.getElementById("name").innerHTML = name;
+            document.getElementById("karma").innerHTML = "Total Karma: " + karma.toString();
+        }
+    });
+</script>
 </body>
 </html>
