@@ -15,21 +15,11 @@
 </div>
 <!-- display all images from user here! -->
 <div class="allimages">
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
-    <div class="image"><img src="../static/QUESTSBLACK.png" alt="image"></div>
 </div>
 <div class="navbar">
     <ul>
         <li><a href="friends" class="button"><img src="../static/duooo.png" alt="leaderboard"></a></li>
         <li><a href="quests" class="button"><img src="../static/QUESTSBLACK.png" alt="quests"></a></li>
-        <li><a href="" class="button"><img src="../static/PROFILEBLACK.png" alt="profile"></a></li>
     </ul>
 </div>
 <script src="../static/loadUserData.js"></script>
@@ -43,11 +33,25 @@
             const phone = userData.phone;
             const friends = userData.friends;
             const quests = userData.quests;
-            const photos = userData.photos;
+            const photo_urls = userData.photo_urls;
+            const photo_quest_ids = userData.photo_quest_ids;
             console.log(userData)
 
             document.getElementById("name").innerHTML = name;
             document.getElementById("karma").innerHTML = "Total Karma: " + karma.toString();
+
+            const container = document.querySelector(".allimages");
+            for (let i = 0; i < photo_urls.length; i++) {
+                const div = document.createElement("div");
+                div.classList.add("image");
+
+                const img = document.createElement("img");
+                img.src = photo_urls[i];
+                img.alt = photo_quest_ids[i];
+
+                div.appendChild(img);
+                container.appendChild(div);
+            }
         }
     });
 </script>

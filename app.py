@@ -539,7 +539,16 @@ def get_user_json():
 
         friends = [str(friend) for friend in user.get("friends", [])]
         quests = [str(quest) for quest in user.get("quests", [])]
-        photos = [str(photo) for photo in user.get("photos", [])]
+        photo_ids = [ObjectId(photo) for photo in user.get("photos", [])]
+
+        photo_docs = list(photos_collection.find({"_id": {"$in": photo_ids}}))
+        photo_urls = []
+        photo_quest_ids = []
+
+        for doc in photo_docs:
+            photo_urls.append(doc.get("url"))
+            photo_quest_ids.append(str(doc.get("quest_id")))
+            print(doc.get("url"))
 
         return jsonify({
             "jamhacks_code": user.get("jamhacks_code"),
@@ -549,7 +558,8 @@ def get_user_json():
             "phone": user.get("phone"),
             "friends": friends,
             "quests": quests,
-            "photos": photos,
+            "photo_urls": photo_urls,
+            "photo_quest_ids": photo_quest_ids
         })
 
     except Exception as e:

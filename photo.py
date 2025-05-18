@@ -1,3 +1,7 @@
+import datetime
+from google.cloud import storage
+
+
 class Photo:
     def __init__(self, user_id, quest_id, url=None, _id=None):
         self._id = _id
@@ -28,6 +32,19 @@ class Photo:
                 _id=doc["_id"]
             )
         return None
+
+    @classmethod
+    def generate_signed_url(cls, bucket_name, blob_name):
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(minutes=15),
+            method="GET"
+        )
+        return url
 
     def id(self):
         return self._id
