@@ -1,3 +1,4 @@
+import certifi
 import os
 import uuid
 from flask import Flask, request, jsonify, redirect, make_response, render_template
@@ -21,7 +22,9 @@ load_dotenv()
 app = Flask(__name__)
 scraper = Scraper()
 
-client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
+MONGO_URI = os.getenv("MONGO_CONNECTION_STRING")
+
+client = MongoClient(MONGO_URI, tls=True, tlsCAFile=certifi.where())
 db = client["karma"]
 users_collection = db["users"]
 
@@ -110,11 +113,12 @@ def friends():
         print(get_user_session())
         current_user = User.get_user_by_id(users_collection, get_user_session())
         all_users_from_db = current_user.friends
-        print(all_users_from_db)
+        print([User.get_user_by_id(users_collection, user_objectid) for user_objectid in all_users_from_db])
         # Sort users by karma in descending order
         # The User objects themselves will be sorted
         sorted_leaderboard_users = sorted(all_users_from_db, key=lambda u: User.get_user_by_id(users_collection, u).karma, reverse=True)
-
+        sorted_leaderboard_users = [User.get_user_by_id(users_collection, user_objectid) for user_objectid in sorted_leaderboard_users]
+        print(sorted_leaderboard_users[0].name)
         return render_template('friends.html', leaderboard_users=sorted_leaderboard_users)
     except Exception as e:
         print(f"Error fetching leaderboard data: {e}")
